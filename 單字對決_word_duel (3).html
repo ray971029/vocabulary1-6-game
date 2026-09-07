@@ -1,0 +1,2607 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>單字對決 Word Duel</title>
+<style>
+  :root{
+    --bg:#0d0f14;
+    --panel:#161a22;
+    --panel-2:#1d222c;
+    --line:#2a3040;
+    --ink:#eef1f6;
+    --sub:#8892a4;
+    --p1:#3d7bff;
+    --p1-glow:rgba(61,123,255,.35);
+    --p2:#ff4d5e;
+    --p2-glow:rgba(255,77,94,.35);
+    --gold:#e0b84a;
+    --good:#31d17a;
+    --bad:#ff4d5e;
+    --warn:#f5a623;
+
+    /* 依「容器」實際寬度（cqw）流動縮放的字級／間距，而不是整個瀏覽器視窗寬度，
+       這樣即使外層面板（例如手機、對話側欄）比視窗窄，字級也會跟著容器本身的寬度縮放 */
+    --fs-brand: clamp(1.15rem, 5cqw, 2rem);
+    --fs-tagline: clamp(.74rem, 3cqw, .94rem);
+    --fs-body: clamp(.85rem, 3cqw, 1.05rem);
+    --fs-word: clamp(1.8rem, 11cqw, 3.6rem);
+    --fs-option: clamp(.85rem, 4cqw, 1.15rem);
+    --fs-buzz: clamp(.95rem, 4.4cqw, 1.3rem);
+    --fs-code: clamp(2rem, 12cqw, 3.4rem);
+    --fs-end-title: clamp(1.4rem, 6.5cqw, 2.3rem);
+    --fs-level-chip: clamp(.82rem, 3.4cqw, 1.05rem);
+    --pad-card: clamp(14px, 3.6cqw, 30px);
+    --pad-app: clamp(10px, 3.2cqw, 24px);
+    --gap-option: clamp(8px, 1.6vh, 14px);
+    --h-option: clamp(52px, 8.5vh, 78px);
+    --h-buzz: clamp(60px, 11vh, 96px);
+    --app-max-w: min(94vw, 860px);
+  }
+  * { box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background:
+      radial-gradient(1100px 600px at 20% -10%, #1a2035 0%, transparent 60%),
+      radial-gradient(1100px 600px at 100% 110%, #241419 0%, transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",-apple-system,BlinkMacSystemFont,sans-serif;
+    display:flex;
+    justify-content:center;
+    min-height:100vh;
+  }
+  .app{
+    width:100%; max-width:var(--app-max-w); padding:var(--pad-app);
+    display:flex; flex-direction:column; min-height:100vh;
+    container-type:inline-size; container-name:appbox;
+  }
+  /* 若瀏覽器不支援 CSS Container Query（極少數舊版），退回用視窗寬度 vw 計算，仍保有流動縮放效果 */
+  @supports not (container-type: inline-size){
+    :root{
+      --fs-brand: clamp(1.15rem, 3.6vw, 2rem);
+      --fs-tagline: clamp(.74rem, 2.2vw, .94rem);
+      --fs-body: clamp(.85rem, 2.2vw, 1.05rem);
+      --fs-word: clamp(1.8rem, 7.4vw, 3.6rem);
+      --fs-option: clamp(.85rem, 2.8vw, 1.15rem);
+      --fs-buzz: clamp(.95rem, 3vw, 1.3rem);
+      --fs-code: clamp(2rem, 8vw, 3.4rem);
+      --fs-end-title: clamp(1.4rem, 4.4vw, 2.3rem);
+      --fs-level-chip: clamp(.82rem, 2.4vw, 1.05rem);
+      --pad-card: clamp(14px, 2.4vw, 30px);
+      --pad-app: clamp(10px, 2.2vw, 24px);
+    }
+  }
+
+  /* ---------- 共用 ---------- */
+  .hidden{ display:none !important; }
+  h1.brand{
+    font-size:var(--fs-brand); font-weight:800; letter-spacing:.02em; margin:4px 0 2px;
+    display:flex; align-items:center; gap:10px;
+  }
+  h1.brand .sword{ filter:drop-shadow(0 0 6px var(--gold)); }
+  .tagline{ color:var(--sub); font-size:var(--fs-tagline); margin-bottom:clamp(14px,3vh,22px); }
+
+  .card{
+    background:linear-gradient(180deg, var(--panel), var(--panel-2));
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:var(--pad-card);
+    box-shadow:0 20px 40px rgba(0,0,0,.35);
+  }
+
+  .btn{
+    display:block; width:100%; text-align:center; padding:clamp(12px,2.6vh,17px) 16px;
+    border-radius:14px; border:1px solid var(--line); background:var(--panel-2);
+    color:var(--ink); font-size:var(--fs-body); font-weight:700; cursor:pointer;
+    transition:transform .12s ease, border-color .2s ease, background .2s ease;
+  }
+  .btn:active{ transform:scale(.98); }
+  .btn:disabled{ opacity:.4; cursor:default; }
+  .btn.primary{ background:linear-gradient(135deg,var(--p1),#274fbf); border-color:transparent; }
+  .btn.danger{ background:linear-gradient(135deg,var(--p2),#b8202f); border-color:transparent; }
+  .btn.gold{ background:linear-gradient(135deg,var(--gold),#a9812a); border-color:transparent; color:#1a1408; }
+  .btn.ghost{ background:transparent; }
+  .btn.small{ padding:10px 12px; font-size:.88rem; border-radius:10px; }
+  .row-gap{ display:flex; flex-direction:column; gap:12px; }
+  .row-2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .field-label{ font-size:var(--fs-tagline); color:var(--sub); margin:14px 0 8px; font-weight:600; }
+  .code-input{
+    width:100%; padding:clamp(12px,3vh,18px); font-size:clamp(1.2rem,6cqw,1.7rem); letter-spacing:.3em; text-align:center;
+    text-transform:uppercase; border-radius:12px; border:1px solid var(--line);
+    background:var(--panel); color:var(--ink); font-weight:800;
+  }
+  .code-input:focus{ outline:none; border-color:var(--p1); }
+
+  .level-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .level-chip{
+    border:2px solid var(--line); border-radius:12px; padding:clamp(9px,2.2vh,14px) 6px; text-align:center;
+    cursor:pointer; background:var(--panel); font-weight:700; color:var(--sub); font-size:var(--fs-level-chip);
+    transition:all .15s ease;
+  }
+  .level-chip small{ display:block; font-weight:500; font-size:clamp(.62rem,2.2cqw,.75rem); margin-top:2px; }
+  .level-chip.on{ color:#fff; border-color:var(--chip); background:var(--chip-bg); box-shadow:0 0 0 3px var(--chip-glow); }
+
+  .hint{ color:var(--sub); font-size:var(--fs-tagline); line-height:1.6; margin-top:10px; }
+  .back-link{ color:var(--sub); font-size:.85rem; background:none; border:none; cursor:pointer; padding:6px 0 16px; text-align:left; }
+
+  /* ---------- 房間等待畫面 ---------- */
+  .room-code-display{
+    font-size:var(--fs-code); font-weight:900; letter-spacing:.3em; text-align:center;
+    color:var(--gold); margin:18px 0 6px; text-shadow:0 0 20px rgba(224,184,74,.4);
+  }
+  .pulse-dot{ width:8px; height:8px; border-radius:50%; background:var(--good); display:inline-block; margin-right:6px; animation:pulse 1.2s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.3;} }
+
+  /* ---------- 對戰畫面 ---------- */
+  .arena-header{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .fighter{ flex:1; }
+  .fighter-name{ font-size:clamp(.7rem,2.6cqw,.85rem); font-weight:700; display:flex; justify-content:space-between; margin-bottom:5px; }
+  .fighter-name .tag{ color:var(--sub); font-weight:500; }
+  .hp-track{ height:clamp(10px,1.8vh,15px); border-radius:8px; background:#000; border:1px solid var(--line); overflow:hidden; position:relative; }
+  .hp-fill{ height:100%; border-radius:8px; transition:width .45s cubic-bezier(.2,.8,.2,1); }
+  .hp-fill.p1{ background:linear-gradient(90deg,var(--p1),#79a4ff); }
+  .hp-fill.p2{ background:linear-gradient(90deg,#79a4ff,var(--p2)); }
+  .fighter.right .fighter-name{ flex-direction:row-reverse; }
+  .fighter.right .hp-fill{ float:right; }
+  .vs-badge{
+    width:clamp(32px,7cqw,44px); height:clamp(32px,7cqw,44px); border-radius:50%; background:var(--panel-2); border:2px solid var(--gold);
+    display:flex; align-items:center; justify-content:center; font-weight:900; font-size:.7rem; color:var(--gold);
+    flex-shrink:0;
+  }
+
+  .round-timer-track{ height:5px; background:var(--panel-2); border-radius:3px; overflow:hidden; margin-bottom:16px; }
+  .round-timer-fill{ height:100%; background:var(--warn); width:100%; transition:width .1s linear; }
+
+  .word-stage{
+    text-align:center; padding:clamp(14px,3.4vh,28px) 10px clamp(12px,2.6vh,22px); position:relative;
+  }
+  .word-stage .level-tag{
+    display:inline-block; font-size:clamp(.65rem,2.4cqw,.78rem); font-weight:800; padding:3px 10px; border-radius:20px;
+    background:var(--chip-bg); color:#fff; margin-bottom:10px; letter-spacing:.05em;
+  }
+  #word-display{ font-size:var(--fs-word); font-weight:900; word-break:break-word; line-height:1.2; }
+  .buzz-status{ min-height:clamp(20px,3.4vh,28px); font-weight:800; margin-top:8px; font-size:clamp(.8rem,3cqw,1rem); }
+  .buzz-status.p1{ color:var(--p1); }
+  .buzz-status.p2{ color:var(--p2); }
+  .buzz-status.warn{ color:var(--warn); }
+
+  .options-grid{ display:flex; flex-direction:column; gap:var(--gap-option); margin:8px 0 18px; }
+  .option-btn{
+    background:var(--panel); border:2px solid var(--line); padding:clamp(11px,2.4vh,16px) 14px; border-radius:12px;
+    font-size:var(--fs-option); color:var(--ink); text-align:left; cursor:pointer; font-weight:600;
+    transition:all .15s ease;
+  }
+  .option-btn:disabled{ cursor:default; }
+  .option-btn.correct{ background:rgba(49,209,122,.18); border-color:var(--good); color:var(--good); }
+  .option-btn.wrong{ background:rgba(255,77,94,.18); border-color:var(--bad); color:var(--bad); }
+  .option-btn.dim{ opacity:.4; }
+
+  /* 本機雙人對戰：選項對半分區搶答（左=玩家A／右=玩家B），中文意思置中顯示 */
+  .option-btn.split{
+    position:relative; padding:0; display:flex; align-items:stretch; overflow:hidden; min-height:var(--h-option);
+  }
+  .option-btn.split .zone{
+    flex:1; border:none; background:rgba(255,255,255,.02); cursor:pointer; padding:0;
+    display:flex; align-items:flex-start; justify-content:flex-start; transition:background .12s ease;
+  }
+  .option-btn.split .zone.a{ background:rgba(61,123,255,.08); justify-content:flex-start; }
+  .option-btn.split .zone.b{ background:rgba(255,77,94,.08); justify-content:flex-end; }
+  .option-btn.split .zone.a:active:not(:disabled){ background:rgba(61,123,255,.3); }
+  .option-btn.split .zone.b:active:not(:disabled){ background:rgba(255,77,94,.3); }
+  .option-btn.split .zone:disabled{ cursor:default; }
+  .option-btn.split .zone-tag{
+    font-size:.65rem; font-weight:800; opacity:.55; padding:6px 9px; color:var(--ink);
+  }
+  .option-btn.split .divider{ width:2px; background:var(--line); flex-shrink:0; }
+  .option-btn.split .option-label{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    text-align:center; padding:0 clamp(28px,8cqw,48px); font-size:var(--fs-option); font-weight:700; color:var(--ink);
+    pointer-events:none; line-height:1.3;
+  }
+  .option-btn.split.correct{ border-color:var(--good); }
+  .option-btn.split.correct .option-label{ color:var(--good); }
+  .option-btn.split.wrong{ border-color:var(--bad); }
+  .option-btn.split.wrong .option-label{ color:var(--bad); }
+
+  .buzz-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:6px; }
+  .buzz-row.single{ grid-template-columns:1fr; }
+  .buzz-btn{
+    padding:clamp(14px,3vh,22px) 10px; min-height:var(--h-buzz); border-radius:16px; border:none; font-weight:900; font-size:var(--fs-buzz);
+    cursor:pointer; color:#fff; letter-spacing:.05em; transition:transform .1s ease;
+  }
+  .buzz-btn:active:not(:disabled){ transform:scale(.96); }
+  .buzz-btn:disabled{ opacity:.35; cursor:default; }
+  .buzz-btn.p1{ background:linear-gradient(135deg,var(--p1),#1d3c8f); box-shadow:0 8px 22px var(--p1-glow); }
+  .buzz-btn.p2{ background:linear-gradient(135deg,var(--p2),#8f1622); box-shadow:0 8px 22px var(--p2-glow); }
+  .key-hint{ display:block; font-size:clamp(.6rem,2.2cqw,.72rem); font-weight:500; opacity:.75; margin-top:3px; }
+
+  .combo-badge{
+    position:absolute; top:2px; right:8px; font-size:.75rem; font-weight:800; color:var(--gold);
+  }
+
+  /* ---------- 結算畫面 ---------- */
+  .end-title{ font-size:var(--fs-end-title); font-weight:900; text-align:center; margin:10px 0 4px; }
+  .end-sub{ text-align:center; color:var(--sub); margin-bottom:18px; font-size:var(--fs-body); }
+  .end-stats{ display:flex; justify-content:space-around; margin:18px 0; }
+  .end-stat b{ display:block; font-size:clamp(1.3rem,5.6cqw,1.9rem); }
+  .end-stat span{ color:var(--sub); font-size:var(--fs-tagline); }
+
+  .footer-note{ margin-top:auto; padding-top:18px; color:var(--sub); font-size:clamp(.62rem,2cqw,.72rem); text-align:center; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ 選單畫面 ============ -->
+  <div id="screen-menu">
+    <h1 class="brand"><span class="sword">⚔️</span> 單字對決</h1>
+    <div class="tagline">Word Duel — 依 7000 單字六級分級，搶答制對戰</div>
+
+    <div class="card row-gap">
+      <button class="btn primary" id="btn-mode-local">🏠 本機雙人對戰<br><small style="font-weight:500;opacity:.8">同一台裝置，選項分兩半 A/B 搶按</small></button>
+      <button class="btn danger" id="btn-mode-online">🌐 連線對戰<br><small style="font-weight:500;opacity:.8">兩台裝置，用房間代碼配對</small></button>
+    </div>
+    <div class="hint">💡 搶答制：雙方看到同一題，先搶到的人可以作答；答對就對對手造成傷害，等級越高傷害越大，先把對手 HP 歸零（或單字用完時 HP 較高）獲勝。</div>
+  </div>
+
+  <!-- ============ 連線：建立或加入 ============ -->
+  <div id="screen-online-choice" class="hidden">
+    <button class="back-link" data-back="screen-menu">← 返回</button>
+    <h1 class="brand">🌐 連線對戰</h1>
+    <div class="card row-gap">
+      <button class="btn primary" id="btn-create-room">建立房間（我是房主）</button>
+      <button class="btn ghost" id="btn-join-room" style="border:1px solid var(--line)">輸入代碼加入房間</button>
+    </div>
+    <div id="join-code-box" class="card hidden" style="margin-top:14px;">
+      <div class="field-label">房間代碼</div>
+      <input class="code-input" id="join-code-input" maxlength="5" placeholder="AB12C">
+      <button class="btn primary" id="btn-join-confirm" style="margin-top:14px;">加入</button>
+      <div id="join-error" class="hint" style="color:var(--bad)"></div>
+    </div>
+  </div>
+
+  <!-- ============ 選擇單字等級 ============ -->
+  <div id="screen-levels" class="hidden">
+    <button class="back-link" id="levels-back">← 返回</button>
+    <h1 class="brand">選擇單字範圍</h1>
+    <div class="tagline">可複選多個等級混合出題</div>
+    <div class="card">
+      <div class="level-grid" id="level-grid"></div>
+      <div class="field-label">題數（每場對戰）</div>
+      <div class="row-2" id="round-count-group"></div>
+      <div class="hint" id="levels-hint">請至少選擇一個等級</div>
+      <button class="btn gold" id="btn-levels-continue" style="margin-top:18px;" disabled>下一步</button>
+    </div>
+  </div>
+
+  <!-- ============ 房主等待畫面 ============ -->
+  <div id="screen-waiting" class="hidden">
+    <h1 class="brand">等待對手加入…</h1>
+    <div class="card" style="text-align:center;">
+      <div class="hint">把這組代碼給你的對手輸入</div>
+      <div class="room-code-display" id="waiting-code">------</div>
+      <div class="hint"><span class="pulse-dot"></span>連線中，等待玩家二加入</div>
+      <button class="btn ghost ansi" style="border:1px solid var(--line); margin-top:16px;" id="btn-cancel-room">取消房間</button>
+    </div>
+  </div>
+
+  <!-- ============ 對戰畫面 ============ -->
+  <div id="screen-battle" class="hidden">
+    <div class="arena-header">
+      <div class="fighter left">
+        <div class="fighter-name"><span id="p1-name">玩家一</span><span class="tag" id="p1-score">0</span></div>
+        <div class="hp-track"><div class="hp-fill p1" id="p1-hp" style="width:100%"></div></div>
+      </div>
+      <div class="vs-badge">VS</div>
+      <div class="fighter right">
+        <div class="fighter-name"><span id="p2-name">玩家二</span><span class="tag" id="p2-score">0</span></div>
+        <div class="hp-track"><div class="hp-fill p2" id="p2-hp" style="width:100%"></div></div>
+      </div>
+    </div>
+
+    <div class="round-timer-track"><div class="round-timer-fill" id="round-timer-fill"></div></div>
+
+    <div class="word-stage">
+      <span class="level-tag" id="word-level-tag">Lv.1</span>
+      <div id="word-display">Loading...</div>
+      <div class="buzz-status" id="buzz-status"></div>
+    </div>
+
+    <div class="options-grid" id="options-container"></div>
+
+    <div class="buzz-row" id="buzz-row">
+      <button class="buzz-btn p1" id="buzz-p1">搶答！<span class="key-hint" id="p1-key-hint">按空白鍵</span></button>
+      <button class="buzz-btn p2" id="buzz-p2">搶答！<span class="key-hint" id="p2-key-hint">按 Enter</span></button>
+    </div>
+  </div>
+
+  <!-- ============ 結算畫面 ============ -->
+  <div id="screen-end" class="hidden">
+    <div class="card">
+      <div class="end-title" id="end-title">🏆 玩家一獲勝！</div>
+      <div class="end-sub" id="end-sub">對戰結束</div>
+      <div class="end-stats">
+        <div class="end-stat"><b id="end-p1-score">0</b><span id="end-p1-label">玩家一得分</span></div>
+        <div class="end-stat"><b id="end-p2-score">0</b><span id="end-p2-label">玩家二得分</span></div>
+      </div>
+      <button class="btn gold" id="btn-play-again">再來一場</button>
+      <button class="btn ghost" id="btn-back-menu" style="border:1px solid var(--line); margin-top:10px;">回到主選單</button>
+    </div>
+  </div>
+
+  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極</div>
+</div>
+
+<script>
+// ==========================================
+// 單字資料庫（依等級 1~6）[word, meaning]
+// ==========================================
+   const dataLevel1 = [
+        ["a/an", "一個；一種"], ["able", "有能力的"], ["about", "關於；大約"], ["above", "在...上面"],
+        ["according to", "根據"], ["across", "橫越；穿過"], ["act", "行動；扮演"], ["action", "動作；行動"],
+        ["actor/actress", "男演員/女演員"], ["add", "增加"], ["address", "地址；演說"], ["adult", "成人"],
+        ["afraid", "害怕的"], ["after", "在...之後"], ["afternoon", "下午"], ["again", "再一次"],
+        ["against", "反對；依靠"], ["age", "年齡"], ["ago", "以前"], ["agree", "同意"],
+        ["ahead", "在前方"], ["air", "空氣"], ["airmail", "航空郵件"], ["airplane", "飛機"],
+        ["airport", "機場"], ["all", "全部"], ["allow", "允許"], ["almost", "幾乎"],
+        ["alone", "單獨的"], ["along", "沿著"], ["already", "已經"], ["also", "也；並且"],
+        ["always", "總是"], ["among", "在...之中"], ["and", "和；及"], ["anger", "憤怒"],
+        ["angry", "生氣的"], ["animal", "動物"], ["another", "另一個"], ["answer", "回答；答案"],
+        ["ant", "螞蟻"], ["any", "任何的"], ["anything", "任何事物"], ["ape", "猿"],
+        ["appear", "出現；似乎"], ["apple", "蘋果"], ["April", "四月"], ["area", "區域"],
+        ["arm", "手臂"], ["army", "軍隊"], ["around", "在...周圍"], ["art", "藝術"],
+        ["ask", "問；要求"], ["August", "八月"], ["aunt", "阿姨；姑姑"], ["autumn", "秋天"],
+        ["away", "遠離"], ["baby", "嬰兒"], ["back", "後面；背部"], ["bad", "壞的"],
+        ["bag", "袋子"], ["ball", "球"], ["balloon", "氣球"], ["banana", "香蕉"],
+        ["band", "樂團；帶子"], ["bank", "銀行；河岸"], ["bar", "棒；酒吧"], ["barber", "理髮師"],
+        ["base", "基礎；基地"], ["baseball", "棒球"], ["basic", "基礎的"], ["basket", "籃子"],
+        ["basketball", "籃球"], ["bat", "蝙蝠；球棒"], ["bath", "洗澡"], ["bathe", "洗澡(動詞)"],
+        ["bathroom", "浴室"], ["beach", "海灘"], ["bear", "熊；忍受"], ["beat", "打敗；敲打"],
+        ["beautiful", "美麗的"], ["beauty", "美貌"], ["because", "因為"], ["become", "變成"],
+        ["bed", "床"], ["bee", "蜜蜂"], ["before", "在...之前"], ["begin", "開始"],
+        ["behind", "在...後面"], ["believe", "相信"], ["bell", "鈴；鐘"], ["belong", "屬於"],
+        ["below", "在...下面"], ["beside", "在...旁邊"], ["best", "最好的"], ["better", "更好的"],
+        ["between", "在...之間"], ["bicycle", "腳踏車"], ["big", "大的"], ["bird", "鳥"],
+        ["birth", "出生"], ["bit", "一點點"], ["bite", "咬"], ["black", "黑色的"],
+        ["block", "街區；阻擋"], ["blood", "血"], ["blow", "吹"], ["blue", "藍色的"],
+        ["boat", "船"], ["body", "身體"], ["bone", "骨頭"], ["book", "書；預訂"],
+        ["born", "出生的"], ["both", "兩者都"], ["bottom", "底部"], ["bowl", "碗"],
+        ["box", "箱子"], ["boy", "男孩"], ["brave", "勇敢的"], ["bread", "麵包"],
+        ["break", "打破；休息"], ["breakfast", "早餐"], ["bridge", "橋"], ["bright", "明亮的"],
+        ["bring", "帶來"], ["brother", "兄弟"], ["brown", "棕色的"], ["bug", "蟲子"],
+        ["build", "建造"], ["building", "建築物"], ["bus", "公車"], ["busy", "忙碌的"],
+        ["but", "但是"], ["butter", "奶油"], ["butterfly", "蝴蝶"], ["buy", "買"],
+        ["by", "藉由；在旁"], ["cage", "籠子"], ["cake", "蛋糕"], ["call", "呼叫；打電話"],
+        ["camel", "駱駝"], ["camera", "相機"], ["camp", "露營"], ["can", "能夠；罐頭"],
+        ["candy", "糖果"], ["cap", "帽子(無邊)"], ["car", "車子"], ["card", "卡片"],
+        ["care", "關心；照顧"], ["careful", "小心的"], ["carry", "攜帶"], ["case", "情況；案例"],
+        ["cat", "貓"], ["catch", "接住；趕上"], ["cause", "導致；原因"], ["cent", "一分錢"],
+        ["center", "中心"], ["certain", "確定的"], ["chair", "椅子"], ["chance", "機會"],
+        ["chart", "圖表"], ["chase", "追逐"], ["check", "檢查；支票"], ["chick", "小雞"],
+        ["chicken", "雞肉；雞"], ["chief", "首領；主要的"], ["child", "小孩"], ["Christmas", "聖誕節"],
+        ["church", "教堂"], ["city", "城市"], ["class", "班級；階級"], ["clean", "乾淨的"],
+        ["clear", "清楚的"], ["climb", "攀爬"], ["clock", "時鐘"], ["close", "關閉；靠近的"],
+        ["cloud", "雲"], ["coast", "海岸"], ["coat", "外套"], ["coffee", "咖啡"],
+        ["cold", "冷的；感冒"], ["color", "顏色"], ["come", "來"], ["common", "常見的"],
+        ["continue", "繼續"], ["cook", "煮；廚師"], ["cookie", "餅乾"], ["cool", "涼爽的；酷"],
+        ["corn", "玉米"], ["correct", "正確的"], ["cost", "花費；成本"], ["count", "計算"],
+        ["country", "國家；鄉村"], ["course", "課程；路線"], ["cover", "覆蓋"], ["cow", "母牛"],
+        ["cowboy", "牛仔"], ["crow", "烏鴉"], ["cry", "哭；叫喊"], ["cub", "幼獸"],
+        ["cup", "杯子"], ["cut", "切割"], ["cute", "可愛的"], ["daddy/dad", "爸爸"],
+        ["dance", "跳舞"], ["danger", "危險"], ["dark", "黑暗的"], ["date", "日期；約會"],
+        ["daughter", "女兒"], ["day", "日子；白天"], ["dead", "死的"], ["deal", "交易；處理"],
+        ["dear", "親愛的"], ["death", "死亡"], ["December", "十二月"], ["decide", "決定"],
+        ["deep", "深的"], ["deer", "鹿"], ["desk", "書桌"], ["die", "死亡"],
+        ["different", "不同的"], ["difficult", "困難的"], ["dig", "挖掘"], ["dinner", "晚餐"],
+        ["direct", "直接的"], ["dirty", "髒的"], ["discover", "發現"], ["dish", "盤子；菜餚"],
+        ["do", "做"], ["doctor", "醫生"], ["dog", "狗"], ["doll", "洋娃娃"],
+        ["dollar", "元"], ["door", "門"], ["dove", "鴿子"], ["down", "向下"],
+        ["dozen", "一打(12個)"], ["draw", "畫；拉"], ["dream", "夢"], ["drink", "喝；飲料"],
+        ["drive", "駕駛"], ["driver", "司機"], ["dry", "乾的"], ["duck", "鴨子"],
+        ["during", "在...期間"], ["each", "每一個"], ["eagle", "老鷹"], ["ear", "耳朵"],
+        ["early", "早的"], ["earth", "地球；泥土"], ["east", "東方"], ["easy", "容易的"],
+        ["eat", "吃"], ["edge", "邊緣"], ["egg", "蛋"], ["eight", "八"],
+        ["either", "兩者其一"], ["elephant", "大象"], ["eleven", "十一"], ["else", "其他的"],
+        ["end", "結束"], ["English", "英文"], ["enough", "足夠的"], ["enter", "進入"],
+        ["equal", "平等的"], ["even", "甚至；平手的"], ["evening", "傍晚"], ["ever", "曾經"],
+        ["every", "每一個"], ["exam", "考試"], ["example", "例子"], ["except", "除了...之外"],
+        ["eye", "眼睛"], ["face", "臉；面對"], ["fact", "事實"], ["factory", "工廠"],
+        ["fall", "掉落；秋天"], ["false", "錯誤的"], ["family", "家庭"], ["fan", "風扇；迷"],
+        ["far", "遠的"], ["farm", "農場"], ["farmer", "農夫"], ["fast", "快的"],
+        ["fat", "胖的"], ["father", "父親"], ["fear", "恐懼"], ["February", "二月"],
+        ["feed", "餵食"], ["feel", "感覺"], ["feeling", "感覺(名詞)"], ["few", "很少的"],
+        ["fifteen", "十五"], ["fifty", "五十"], ["fight", "打架"], ["fill", "填滿"],
+        ["final", "最後的"], ["find", "找到"], ["fine", "好的；罰款"], ["finger", "手指"],
+        ["finish", "完成"], ["fire", "火；開除"], ["first", "第一"], ["fish", "魚"],
+        ["five", "五"], ["floor", "地板；樓層"], ["flower", "花"], ["fly", "飛；蒼蠅"],
+        ["fog", "霧"], ["follow", "跟隨"], ["food", "食物"], ["foot", "腳"],
+        ["for", "為了"], ["force", "力量；強迫"], ["foreign", "外國的"], ["forest", "森林"],
+        ["forget", "忘記"], ["fork", "叉子"], ["forty", "四十"], ["four", "四"],
+        ["fourteen", "十四"], ["free", "免費的；自由的"], ["fresh", "新鮮的"], ["Friday", "星期五"],
+        ["friend", "朋友"], ["frog", "青蛙"], ["from", "來自"], ["front", "前面"],
+        ["fruit", "水果"], ["full", "滿的"], ["fun", "樂趣"], ["funny", "好笑的"],
+        ["game", "遊戲"], ["garden", "花園"], ["gas", "瓦斯；汽油"], ["general", "一般的；將軍"],
+        ["get", "得到"], ["ghost", "鬼"], ["gift", "禮物"], ["girl", "女孩"],
+        ["give", "給"], ["glad", "高興的"], ["glass", "玻璃；杯子"], ["go", "去"],
+        ["god", "神"], ["gold", "黃金"], ["good", "好的"], ["goodbye", "再見"],
+        ["goose", "鵝"], ["grand", "宏偉的"], ["grass", "草"], ["gray", "灰色"],
+        ["great", "很棒的"], ["green", "綠色"], ["ground", "地面"], ["group", "群組"],
+        ["grow", "生長"], ["guess", "猜測"], ["guest", "客人"], ["guide", "引導；導遊"],
+        ["gun", "槍"], ["hair", "頭髮"], ["half", "一半"], ["ham", "火腿"],
+        ["hand", "手"], ["happen", "發生"], ["happy", "快樂的"], ["hard", "困難的；硬的"],
+        ["hat", "帽子"], ["hate", "討厭"], ["have", "有"], ["he", "他"],
+        ["head", "頭"], ["health", "健康"], ["hear", "聽見"], ["heart", "心"],
+        ["heat", "熱度"], ["heavy", "重的"], ["hello", "你好"], ["help", "幫忙"],
+        ["her", "她的"], ["here", "這裡"], ["high", "高的"], ["hill", "山丘"],
+        ["him", "他(受格)"], ["his", "他的"], ["history", "歷史"], ["hit", "打擊"],
+        ["hold", "握住；舉辦"], ["hole", "洞"], ["holiday", "假日"], ["home", "家"],
+        ["homework", "功課"], ["hope", "希望"], ["horse", "馬"], ["hot", "熱的"],
+        ["hour", "小時"], ["house", "房子"], ["how", "如何"], ["huge", "巨大的"],
+        ["human", "人類"], ["hundred", "一百"], ["hungry", "飢餓的"], ["hurt", "受傷"],
+        ["husband", "丈夫"], ["I", "我"], ["ice", "冰"], ["idea", "主意"],
+        ["if", "如果"], ["important", "重要的"], ["in", "在...裡面"], ["inch", "英吋"],
+        ["inside", "在內部"], ["interest", "興趣；利息"], ["into", "進入..."], ["iron", "鐵；熨斗"],
+        ["is", "是"], ["it", "它"], ["job", "工作"], ["join", "加入"],
+        ["joke", "笑話"], ["joy", "喜悅"], ["juice", "果汁"], ["July", "七月"],
+        ["jump", "跳"], ["June", "六月"], ["just", "剛好；正義的"], ["keep", "保持"],
+        ["key", "鑰匙；關鍵"], ["kick", "踢"], ["kid", "小孩；開玩笑"], ["kill", "殺"],
+        ["kind", "種類；仁慈的"], ["king", "國王"], ["kiss", "親吻"], ["kitchen", "廚房"],
+        ["kite", "風箏"], ["knee", "膝蓋"], ["knife", "刀子"], ["know", "知道"],
+        ["lack", "缺乏"], ["lady", "淑女"], ["lake", "湖泊"], ["lamb", "小羊"], ["lamp", "燈"],
+        ["land", "土地；降落"], ["large", "巨大的"], ["last", "最後的；持續"], ["late", "遲到的"],
+        ["laugh", "大笑"], ["law", "法律"], ["lay", "放置；產卵"], ["lazy", "懶惰的"],
+        ["lead", "領導"], ["leader", "領導者"], ["leaf", "葉子"], ["learn", "學習"],
+        ["least", "最少的"], ["leave", "離開；遺留"], ["left", "左邊"], ["leg", "腿"],
+        ["less", "較少的"], ["lesson", "課程；教訓"], ["let", "讓"], ["letter", "信；字母"],
+        ["level", "等級"], ["lie", "說謊；躺"], ["life", "生活；生命"], ["lift", "舉起；電梯"],
+        ["light", "光線；輕的"], ["like", "喜歡；像"], ["likely", "可能的"], ["lily", "百合"],
+        ["line", "線；排隊"], ["lion", "獅子"], ["lip", "嘴唇"], ["list", "清單"],
+        ["listen", "聆聽"], ["little", "小的"], ["live", "居住；活著"], ["long", "長的"],
+        ["look", "看"], ["lot", "很多"], ["loud", "大聲的"], ["love", "愛"],
+        ["low", "低的"], ["lucky", "幸運的"], ["lunch", "午餐"], ["machine", "機器"],
+        ["mad", "生氣的；發瘋的"], ["mail", "郵件"], ["make", "製作"], ["man", "男人"],
+        ["many", "許多的"], ["map", "地圖"], ["March", "三月"], ["market", "市場"],
+        ["marry", "結婚"], ["master", "大師；精通"], ["match", "比賽；火柴"], ["matter", "事情；要緊"],
+        ["May", "五月"], ["maybe", "也許"], ["me", "我(受格)"], ["mean", "意指；刻薄的"],
+        ["meat", "肉"], ["meet", "遇見"], ["middle", "中間"], ["mile", "英哩"],
+        ["milk", "牛奶"], ["mind", "介意；心智"], ["minute", "分鐘"], ["miss", "想念；錯過"],
+        ["mistake", "錯誤"], ["moment", "片刻"], ["money", "錢"], ["monkey", "猴子"],
+        ["month", "月份"], ["moon", "月亮"], ["more", "更多的"], ["morning", "早晨"],
+        ["most", "大部分的"], ["mother", "母親"], ["mountain", "山"], ["mouse", "老鼠"],
+        ["mouth", "嘴巴"], ["move", "移動"], ["movie", "電影"], ["Mr.", "先生"],
+        ["Mrs.", "太太"], ["Ms.", "女士"], ["much", "許多的(不可數)"], ["mud", "泥巴"],
+        ["mug", "馬克杯"], ["music", "音樂"], ["must", "必須"], ["my", "我的"],
+        ["name", "名字"], ["nation", "國家"], ["nature", "自然"], ["near", "靠近"],
+        ["neck", "脖子"], ["need", "需要"], ["never", "從不"], ["new", "新的"],
+        ["news", "新聞"], ["newspaper", "報紙"], ["next", "下一個"], ["nice", "好的"],
+        ["night", "夜晚"], ["nine", "九"], ["nineteen", "十九"], ["ninety", "九十"],
+        ["no", "不"], ["noise", "噪音"], ["noisy", "吵鬧的"], ["noon", "中午"],
+        ["nor", "也不"], ["north", "北方"], ["nose", "鼻子"], ["not", "不"],
+        ["note", "筆記；便條"], ["nothing", "沒什麼"], ["notice", "注意；公告"], ["November", "十一月"],
+        ["now", "現在"], ["number", "數字"], ["nurse", "護士"], ["ocean", "海洋"],
+        ["o'clock", "...點鐘"], ["October", "十月"], ["of", "的"], ["off", "關掉"],
+        ["office", "辦公室"], ["officer", "官員；警官"], ["often", "常常"], ["oil", "油"],
+        ["old", "老的；舊的"], ["on", "在...上"], ["once", "一次；曾經"], ["one", "一"],
+        ["only", "唯一的"], ["open", "打開"], ["or", "或者"], ["orange", "橘子；橘色"],
+        ["order", "點餐；命令"], ["other", "其他的"], ["our", "我們的"], ["out", "外面"],
+        ["outside", "在外面"], ["over", "結束；越過"], ["own", "自己的；擁有"], ["page", "頁"],
+        ["paint", "油漆；畫"], ["pair", "一雙"], ["pants", "褲子"], ["paper", "紙"],
+        ["parent", "雙親之一"], ["park", "公園；停車"], ["part", "部分"], ["party", "派對"],
+        ["pass", "通過"], ["past", "過去"], ["pay", "付錢"], ["pen", "原子筆"],
+        ["pencil", "鉛筆"], ["people", "人們"], ["perhaps", "也許"], ["person", "人"],
+        ["pet", "寵物"], ["piano", "鋼琴"], ["picture", "圖片"], ["pie", "派"],
+        ["piece", "一張；一片"], ["pig", "豬"], ["place", "地點"], ["plan", "計畫"],
+        ["plant", "植物；種植"], ["play", "玩；播放"], ["player", "選手"], ["playground", "操場"],
+        ["please", "請"], ["pocket", "口袋"], ["poetry", "詩"], ["point", "點；指出"],
+        ["police", "警察"], ["pond", "池塘"], ["pool", "池子"], ["poor", "貧窮的；可憐的"],
+        ["popcorn", "爆米花"], ["position", "位置"], ["possible", "可能的"], ["power", "力量；權力"],
+        ["practice", "練習"], ["prepare", "準備"], ["pretty", "漂亮的"], ["price", "價格"],
+        ["print", "列印"], ["problem", "問題"], ["prove", "證明"], ["public", "公眾的"],
+        ["pull", "拉"], ["purple", "紫色"], ["purpose", "目的"], ["push", "推"],
+        ["put", "放置"], ["queen", "皇后"], ["question", "問題"], ["quick", "快速的"],
+        ["quiet", "安靜的"], ["quite", "相當"], ["race", "賽跑；種族"], ["radio", "收音機"],
+        ["railroad", "鐵路"], ["rain", "雨"], ["rainbow", "彩虹"], ["raise", "舉起；撫養"],
+        ["rat", "大老鼠"], ["reach", "到達；伸手"], ["read", "閱讀"], ["ready", "準備好的"],
+        ["real", "真實的"], ["reason", "理由"], ["receive", "收到"], ["red", "紅色"],
+        ["remember", "記得"], ["report", "報告"], ["rest", "休息；其餘"], ["return", "返回"],
+        ["rice", "米飯"], ["rich", "富有的"], ["ride", "騎"], ["right", "右邊；正確的"],
+        ["ring", "戒指；鈴聲"], ["rise", "升起"], ["river", "河流"], ["road", "道路"],
+        ["robot", "機器人"], ["rock", "岩石"], ["roll", "滾動"], ["roof", "屋頂"],
+        ["room", "房間"], ["rooster", "公雞"], ["root", "根"], ["rope", "繩子"],
+        ["rose", "玫瑰"], ["round", "圓的"], ["row", "划船；一排"], ["rub", "摩擦"],
+        ["rubber", "橡膠"], ["rule", "規則"], ["run", "跑"], ["sad", "傷心的"],
+        ["safe", "安全的"], ["sail", "航行"], ["sale", "特賣"], ["salt", "鹽"],
+        ["same", "相同的"], ["sand", "沙子"], ["Saturday", "星期六"], ["save", "儲存；拯救"],
+        ["saw", "鋸子；看見(see過去式)"], ["say", "說"], ["scare", "驚嚇"], ["scene", "場景"],
+        ["school", "學校"], ["sea", "海"], ["season", "季節"], ["seat", "座位"],
+        ["second", "第二；秒"], ["see", "看見"], ["seed", "種子"], ["seem", "似乎"],
+        ["seesaw", "蹺蹺板"], ["self", "自己"], ["selfish", "自私的"], ["sell", "賣"],
+        ["send", "寄送"], ["sense", "感覺；理智"], ["sentence", "句子"], ["September", "九月"],
+        ["serve", "服務"], ["service", "服務(名詞)"], ["set", "一組；設定"], ["seven", "七"],
+        ["seventeen", "十七"], ["seventy", "七十"], ["several", "幾個"], ["shake", "搖動"],
+        ["shall", "將要(助動詞)"], ["shape", "形狀"], ["shark", "鯊魚"], ["sharp", "銳利的"],
+        ["she", "她"], ["sheep", "綿羊"], ["sheet", "床單；一張(紙)"], ["shine", "照耀"],
+        ["ship", "船"], ["shirt", "襯衫"], ["shoe", "鞋子"], ["shop", "商店"],
+        ["shore", "岸邊"], ["short", "短的；矮的"], ["shot", "射擊；注射"], ["shoulder", "肩膀"],
+        ["shout", "喊叫"], ["show", "顯示；表演"], ["shut", "關上"], ["shy", "害羞的"],
+        ["sick", "生病的"], ["side", "邊；側"], ["sight", "視力；景色"], ["silly", "愚蠢的"],
+        ["silver", "銀色"], ["simple", "簡單的"], ["since", "自從"], ["sing", "唱歌"],
+        ["singer", "歌手"], ["sir", "先生(尊稱)"], ["sister", "姊妹"], ["sit", "坐"],
+        ["six", "六"], ["sixteen", "十六"], ["sixty", "六十"], ["size", "尺寸"],
+        ["skill", "技巧"], ["skin", "皮膚"], ["sky", "天空"], ["sleep", "睡覺"],
+        ["slow", "慢的"], ["small", "小的"], ["smart", "聰明的"], ["smell", "聞；味道"],
+        ["smile", "微笑"], ["smoke", "煙；抽菸"], ["snake", "蛇"], ["snow", "雪"],
+        ["so", "所以"], ["soap", "肥皂"], ["soda", "汽水"], ["sofa", "沙發"],
+        ["soft", "柔軟的"], ["soil", "土壤"], ["some", "一些"], ["someone", "某人"],
+        ["something", "某事"], ["sometimes", "有時候"], ["son", "兒子"], ["song", "歌曲"],
+        ["soon", "很快"], ["sorry", "抱歉的"], ["soul", "靈魂"], ["sound", "聲音"],
+        ["soup", "湯"], ["sour", "酸的"], ["south", "南方"], ["space", "空間；太空"],
+        ["speak", "說話"], ["special", "特別的"], ["speech", "演講"], ["spell", "拼字"],
+        ["spend", "花費"], ["spoon", "湯匙"], ["sport", "運動"], ["spring", "春天；泉水"],
+        ["stair", "樓梯"], ["stand", "站立"], ["star", "星星"], ["start", "開始"],
+        ["state", "州；狀態"], ["station", "車站"], ["stay", "停留"], ["step", "腳步；步驟"],
+        ["still", "仍然"], ["stone", "石頭"], ["stop", "停止"], ["store", "商店"],
+        ["story", "故事"], ["strange", "奇怪的"], ["street", "街道"], ["strong", "強壯的"],
+        ["student", "學生"], ["study", "研讀"], ["stupid", "笨的"], ["such", "這樣的"],
+        ["sugar", "糖"], ["summer", "夏天"], ["sun", "太陽"], ["Sunday", "星期日"],
+        ["super", "超級的"], ["supper", "晚餐"], ["sure", "確定的"], ["surprise", "驚喜"],
+        ["sweet", "甜的"], ["swim", "游泳"], ["table", "桌子"], ["tail", "尾巴"],
+        ["take", "拿；花費"], ["tale", "故事"], ["talk", "說話"], ["tall", "高的"],
+        ["taste", "品嚐；味道"], ["taxi", "計程車"], ["tea", "茶"], ["teach", "教導"],
+        ["teacher", "老師"], ["tell", "告訴"], ["ten", "十"], ["than", "比..."],
+        ["thank", "感謝"], ["that", "那個"], ["the", "這/那"], ["their", "他們的"],
+        ["them", "他們(受格)"], ["then", "然後；那時"], ["there", "那裡"], ["these", "這些"],
+        ["they", "他們"], ["thing", "事情；東西"], ["think", "想"], ["third", "第三"],
+        ["thirteen", "十三"], ["thirty", "三十"], ["this", "這個"], ["those", "那些"],
+        ["though", "雖然"], ["thought", "想法"], ["thousand", "一千"], ["three", "三"],
+        ["throw", "丟"], ["Thursday", "星期四"], ["ticket", "票"], ["tie", "領帶；綁"],
+        ["tiger", "老虎"], ["time", "時間"], ["tiny", "極小的"], ["tire", "輪胎；使疲累"],
+        ["to", "去；給"], ["today", "今天"], ["together", "一起"], ["tomorrow", "明天"],
+        ["tone", "語氣；音調"], ["tonight", "今晚"], ["too", "也；太"], ["tool", "工具"],
+        ["top", "頂端"], ["total", "總共的"], ["touch", "觸摸"], ["toward", "朝向"],
+        ["town", "城鎮"], ["toy", "玩具"], ["train", "火車；訓練"], ["tree", "樹"],
+        ["trip", "旅行"], ["trouble", "麻煩"], ["true", "真實的"], ["try", "嘗試"],
+        ["T-shirt", "T恤"], ["Tuesday", "星期二"], ["tummy", "肚子"], ["turn", "轉彎"],
+        ["twelve", "十二"], ["twenty", "二十"], ["twice", "兩次"], ["two", "二"],
+        ["uncle", "叔叔；伯伯"], ["under", "在...下面"], ["understand", "了解"], ["unit", "單位"],
+        ["until", "直到"], ["up", "向上"], ["upstairs", "樓上"], ["us", "我們(受格)"],
+        ["use", "使用"], ["useful", "有用的"], ["vegetable", "蔬菜"], ["very", "非常"],
+        ["view", "景色；觀點"], ["visit", "拜訪"], ["voice", "聲音"], ["wait", "等待"],
+        ["walk", "走路"], ["wall", "牆"], ["want", "想要"], ["war", "戰爭"],
+        ["warm", "溫暖的"], ["wash", "清洗"], ["waste", "浪費"], ["watch", "手錶；觀看"],
+        ["water", "水"], ["way", "路；方法"], ["we", "我們"], ["weak", "虛弱的"],
+        ["wear", "穿著"], ["weather", "天氣"], ["wedding", "婚禮"], ["Wednesday", "星期三"],
+        ["week", "週"], ["weekend", "週末"], ["weigh", "稱重"], ["weight", "重量"],
+        ["welcome", "歡迎"], ["well", "很好；井"], ["west", "西方"], ["what", "什麼"],
+        ["when", "何時"], ["where", "哪裡"], ["whether", "是否"], ["which", "哪一個"],
+        ["while", "當...時"], ["white", "白色"], ["who", "誰"], ["whole", "整個"],
+        ["whom", "誰(受格)"], ["whose", "誰的"], ["why", "為什麼"], ["wide", "寬的"],
+        ["wife", "妻子"], ["will", "將會"], ["win", "贏"], ["wind", "風"],
+        ["window", "窗戶"], ["wine", "酒"], ["winter", "冬天"], ["wish", "希望"],
+        ["with", "和...一起"], ["woman", "女人"], ["wood", "木頭"], ["word", "字"],
+        ["work", "工作"], ["worker", "工人"], ["world", "世界"], ["worm", "蟲"],
+        ["worry", "擔心"], ["worse", "更糟的"], ["worst", "最糟的"], ["write", "寫"],
+        ["writer", "作家"], ["wrong", "錯誤的"], ["yam", "番薯"], ["year", "年"],
+        ["yellow", "黃色"], ["yes", "是"], ["yesterday", "昨天"], ["yet", "還沒"],
+        ["you", "你"], ["young", "年輕的"], ["your", "你的"], ["yummy", "好吃的"],
+        ["zero", "零"], ["zoo", "動物園"]
+    ];
+
+    const dataLevel2 = [
+        ["ability", "能力"], ["abroad", "在國外"], ["absence", "缺席；不在"], ["absent", "缺席的"],
+        ["accept", "接受"], ["active", "活躍的；主動的"], ["addition", "增加；加法"], ["advance", "前進；進步"],
+        ["affair", "事務；曖昧關係"], ["aid", "幫助；援助"], ["aim", "瞄準；目標"], ["aircraft", "飛行器"],
+        ["airline", "航空公司"], ["alarm", "警報；鬧鐘"], ["album", "相簿；專輯"], ["alike", "相似的"],
+        ["alive", "活著的"], ["almond", "杏仁"], ["aloud", "大聲地"], ["alphabet", "字母表"],
+        ["although", "雖然"], ["altogether", "總共；完全"], ["amount", "數量；總計"], ["ancient", "古代的"],
+        ["ankle", "腳踝"], ["anybody/anyone", "任何人"], ["anyhow", "無論如何"], ["anytime", "任何時間"],
+        ["anyway", "無論如何；反正"], ["anywhere/anyplace", "任何地方"], ["apartment", "公寓"], ["appearance", "外表；出現"],
+        ["appetite", "食慾"], ["apply", "申請；應用"], ["apron", "圍裙"], ["argue(ment)", "爭論"],
+        ["arm (2)", "武裝；配備"], ["armchair", "扶手椅"], ["arrange(ment)", "安排"], ["arrest", "逮捕"],
+        ["arrive", "到達"], ["arrow", "箭；箭頭"], ["article (2)/essay", "文章；論文"], ["artist", "藝術家"],
+        ["asleep", "睡著的"], ["assistant", "助理"], ["attack", "攻擊"], ["attend", "參加；出席"],
+        ["attention", "注意"], ["avoid", "避免"], ["baby-sit", "當臨時保母"], ["baby-sitter", "臨時保母"],
+        ["backward", "向後的"], ["backward(s)", "向後地"], ["bake", "烘烤"], ["bakery", "麵包店"],
+        ["balcony", "陽台"], ["bamboo", "竹子"], ["banker", "銀行家"], ["barbecue/BBQ", "烤肉"],
+        ["bark (1) (2)", "吠叫；樹皮"], ["basement", "地下室"], ["basics", "基礎"], ["basis", "基礎；根據"],
+        ["battle", "戰役"], ["bead", "珠子"], ["bean", "豆子"], ["bear (2)", "忍受；承擔"],
+        ["beard", "鬍鬚"], ["bedroom", "臥室"], ["beef", "牛肉"], ["beep", "嗶嗶聲"],
+        ["beer", "啤酒"], ["beetle", "甲蟲"], ["beg", "乞求"], ["beginner", "初學者"],
+        ["belief", "信念；相信"], ["believable", "可信的"], ["belt", "皮帶"], ["bench", "長椅"],
+        ["bend", "彎曲"], ["besides", "除此之外"], ["bet", "打賭"], ["beyond", "超越"],
+        ["bill", "帳單；鈔票"], ["bind", "綁；裝訂"], ["bitter", "苦的"], ["blackboard", "黑板"],
+        ["blank", "空白的"], ["blind", "瞎的"], ["bloody", "血腥的"], ["board (1) (2)", "木板；登機"],
+        ["boil", "沸騰；煮"], ["bomb", "炸彈"], ["bony", "骨瘦如柴的"], ["bookcase", "書櫃"],
+        ["borrow", "借入"], ["boss", "老闆"], ["bother", "打擾；煩惱"], ["bottle", "瓶子"],
+        ["bow (1) (2)", "鞠躬；弓"], ["bowling", "保齡球"], ["brain", "大腦"], ["branch", "樹枝；分店"],
+        ["brand", "品牌"], ["brick", "磚塊"], ["brief", "簡短的"], ["broad", "寬廣的"],
+        ["broadcast", "廣播"], ["brunch", "早午餐"], ["brush", "刷子；刷"], ["bun/roll", "小圓麵包"],
+        ["bundle", "捆；束"], ["burn", "燃燒；燒傷"], ["burst", "爆裂"], ["business", "生意；商業"],
+        ["button", "按鈕；鈕扣"], ["cabbage", "高麗菜"], ["cable", "電纜"], ["café/cafe", "咖啡廳"],
+        ["cafeteria", "自助餐廳"], ["calendar", "日曆"], ["calm", "冷靜的"], ["cancel", "取消"],
+        ["cancer", "癌症"], ["candle", "蠟燭"], ["captain", "隊長；船長"], ["carpet", "地毯"],
+        ["carrot", "紅蘿蔔"], ["cart", "手推車"], ["cartoon", "卡通"], ["cash", "現金"],
+        ["cassette", "卡帶"], ["castle", "城堡"], ["cave", "洞穴"], ["ceiling", "天花板"],
+        ["cell", "細胞；單人牢房"], ["central", "中央的"], ["century", "世紀"], ["cereal", "麥片"],
+        ["chalk", "粉筆"], ["change (1) (2)", "改變；零錢"], ["character", "角色；性格"], ["charge", "收費；充電"],
+        ["cheap", "便宜的"], ["cheat", "作弊；欺騙"], ["chemical", "化學的"], ["chess", "西洋棋"],
+        ["childish", "幼稚的"], ["childlike", "天真爛漫的"], ["chin", "下巴"], ["chocolate", "巧克力"],
+        ["choice", "選擇"], ["choose", "選擇(動詞)"], ["chopstick(s)", "筷子"], ["circle", "圓圈"],
+        ["citizen", "公民"], ["claim", "聲稱；索賠"], ["clap", "拍手"], ["classic", "經典的"],
+        ["claw", "爪子"], ["clay", "黏土"], ["cleaner", "清潔工；清潔劑"], ["clerk", "店員"],
+        ["clever", "聰明的"], ["climate", "氣候"], ["closet", "衣櫥"], ["cloth", "布料"],
+        ["clothe", "給...穿衣"], ["clothes", "衣服"], ["clothing", "衣物(總稱)"], ["cloudy", "多雲的"],
+        ["clown", "小丑"], ["club", "社團；俱樂部"], ["coach", "教練；長途巴士"], ["coal", "煤炭"],
+        ["cock", "公雞"], ["cockroach/roach", "蟑螂"], ["coin", "硬幣"], ["collect", "收集"],
+        ["colorful", "多彩的"], ["comb", "梳子"], ["comfortable", "舒適的"], ["company", "公司；陪伴"],
+        ["compare", "比較"], ["complain", "抱怨"], ["complete", "完成；完整的"], ["computer", "電腦"],
+        ["confirm", "確認"], ["conflict", "衝突"], ["Confucius", "孔子"], ["congratulation(s)", "恭喜"],
+        ["consider", "考慮"], ["contact", "接觸；聯絡"], ["contain", "包含"], ["control", "控制"],
+        ["controller", "控制器"], ["convenient", "方便的"], ["conversation", "對話"], ["cooker", "炊具"],
+        ["copy/Xerox/xerox", "影印；複製"], ["corner", "角落"], ["costly", "昂貴的"], ["cotton", "棉花"],
+        ["cough", "咳嗽"], ["countryside", "鄉下"], ["county", "縣"], ["couple", "一對；夫婦"],
+        ["courage", "勇氣"], ["court", "法庭；球場"], ["cousin", "堂表兄弟姊妹"], ["crab", "螃蟹"],
+        ["crane", "起重機；鶴"], ["crayon", "蠟筆"], ["crazy", "瘋狂的"], ["cream", "鮮奶油；乳霜"],
+        ["create", "創造"], ["crime", "犯罪"], ["crisis", "危機"], ["crop", "農作物"],
+        ["cross", "越過；十字架"], ["crow (2)", "公雞叫聲"], ["crowd", "群眾"], ["cruel", "殘忍的"],
+        ["culture", "文化"], ["cure", "治療"], ["curious", "好奇的"], ["curtain/drape", "窗簾"],
+        ["custom", "習俗"], ["customer", "顧客"], ["daily", "每日的"], ["damage", "損害"],
+        ["dangerous", "危險的"], ["data", "資料"], ["dawn", "黎明"], ["deaf", "聾的"],
+        ["debate", "辯論"], ["debt", "債務"], ["decision", "決定"], ["decorate", "裝飾"],
+        ["degree", "度數；學位"], ["delay", "延遲"], ["delicious", "美味的"], ["deliver", "傳遞；運送"],
+        ["dentist", "牙醫"], ["deny", "否認"], ["department", "部門；系"], ["depend", "依賴"],
+        ["depth", "深度"], ["describe", "描述"], ["desert (1) (2)", "沙漠；拋棄"], ["design", "設計"],
+        ["desire", "渴望"], ["dessert", "甜點"], ["detect", "偵測"], ["develop(ment)", "發展"],
+        ["dew", "露水"], ["dial", "撥號"], ["diamond", "鑽石"], ["diary", "日記"],
+        ["dictionary", "字典"], ["difference", "差異"], ["difficulty", "困難"], ["dinosaur", "恐龍"],
+        ["direction", "方向；指導"], ["director", "導演；主管"], ["disagree(ment)", "不同意"], ["disappear", "消失"],
+        ["discuss", "討論"], ["discussion", "討論(名詞)"], ["dishonest", "不誠實的"], ["display", "展示"],
+        ["distance", "距離"], ["distant", "遙遠的"], ["divide", "分開；除"], ["division", "部門；除法"],
+        ["dizzy", "暈眩的"], ["dolphin", "海豚"], ["donkey", "驢子"], ["dot", "點"],
+        ["double", "雙倍的"], ["doubt", "懷疑"], ["doughnut", "甜甜圈"], ["downtown", "市中心"],
+        ["Dr.", "醫生；博士"], ["drag", "拖拉"], ["dragon", "龍"], ["dragonfly", "蜻蜓"],
+        ["drama", "戲劇"], ["drawer", "抽屜"], ["drawing", "畫"], ["dress", "洋裝；穿衣"],
+        ["drop", "掉落"], ["drug", "藥物；毒品"], ["drugstore", "藥局"], ["drum", "鼓"],
+        ["dryer", "烘乾機"], ["dull", "遲鈍的；枯燥的"], ["dumb", "啞的；笨的"], ["dumpling", "餃子"],
+        ["duty", "責任；義務"], ["earn", "賺取"], ["earthquake", "地震"], ["eastern", "東方的"],
+        ["education", "教育"], ["effect", "影響；效果"], ["effective", "有效的"], ["effort", "努力"],
+        ["elder", "年長的；長輩"], ["elect", "選舉"], ["element", "要素"], ["elevator", "電梯"],
+        ["emotion", "情緒"], ["encourage(ment)", "鼓勵"], ["ending", "結局"], ["enemy", "敵人"],
+        ["energy", "能源；精力"], ["enjoy(ment)", "享受"], ["entire", "整個的"], ["entrance", "入口"],
+        ["envelope", "信封"], ["environment", "環境"], ["eraser", "橡皮擦"], ["error", "錯誤"],
+        ["especially", "尤其是"], ["event", "事件"], ["exact", "確切的"], ["excellent", "優秀的"],
+        ["excite(ment)", "興奮"], ["excuse", "藉口；原諒"], ["exercise", "運動；練習"], ["exist", "存在"],
+        ["expect", "期待"], ["expensive", "昂貴的"], ["experience", "經驗"], ["expert", "專家"],
+        ["explain", "解釋"], ["express", "表達；快遞"], ["extra", "額外的"], ["eyebrow/brow", "眉毛"],
+        ["fail", "失敗"], ["failure", "失敗(名詞)"], ["fair (1) (2)", "公平的；博覽會"], ["famous", "有名的"],
+        ["fault", "錯誤；斷層"], ["favor", "恩惠；偏愛"], ["favorite", "最喜愛的"], ["fearful", "可怕的"],
+        ["fee", "費用"], ["fellow", "傢伙；同伴"], ["female", "女性"], ["fence", "圍籬"],
+        ["festival", "節慶"], ["fever", "發燒"], ["field", "田野；領域"], ["fighter", "戰士；戰鬥機"],
+        ["figure", "數字；身材；人物"], ["film", "底片；電影"], ["fireman/firewoman", "消防員"], ["firm", "堅定的；公司"],
+        ["fisherman", "漁夫"], ["fit", "合身；健康的"], ["fix", "修理；固定"], ["flag", "旗子"],
+        ["flash", "閃光"], ["flashlight/flash", "手電筒"], ["flat", "平坦的；公寓"], ["flight", "班機；飛行"],
+        ["flood", "洪水"], ["flour", "麵粉"], ["flow", "流動"], ["flu", "流感"],
+        ["flute", "長笛"], ["focus", "專注；焦點"], ["foggy", "有霧的"], ["following", "接下來的"],
+        ["fool (1) (2)", "傻瓜；愚弄"], ["foolish", "愚蠢的"], ["football", "美式足球"], ["foreigner", "外國人"],
+        ["forgive", "原諒"], ["form", "表格；形成"], ["formal", "正式的"], ["former", "前任的"],
+        ["forward", "向前的"], ["forward(s)", "向前地"], ["fox", "狐狸"], ["frank", "坦白的"],
+        ["freedom", "自由"], ["freezer", "冷凍庫"], ["friendly", "友善的"], ["fright", "驚嚇"],
+        ["frighten", "使驚嚇"], ["function", "功能"], ["further", "進一步的"], ["future", "未來"],
+        ["gain", "獲得"], ["garage", "車庫"], ["garbage", "垃圾"], ["gardener", "園丁"],
+        ["gate", "大門"], ["gather", "聚集"], ["general (2)", "將軍"], ["generous", "慷慨的"],
+        ["gentle", "溫柔的"], ["gentleman", "紳士"], ["geography", "地理"], ["giant", "巨大的；巨人"],
+        ["giraffe", "長頸鹿"], ["glove(s)", "手套"], ["glue", "膠水"], ["goal", "目標；得分"],
+        ["goat", "山羊"], ["golden", "金色的"], ["golf", "高爾夫"], ["govern", "統治"],
+        ["government", "政府"], ["grade", "年級；成績"], ["grape", "葡萄"], ["grassy", "長滿草的"],
+        ["greedy", "貪心的"], ["greet", "問候"], ["growth", "成長"], ["guard", "警衛；守衛"],
+        ["guava", "芭樂"], ["guitar", "吉他"], ["guy", "傢伙"], ["habit", "習慣"],
+        ["hall", "大廳；走廊"], ["hamburger/burger", "漢堡"], ["hammer", "槌子"], ["handkerchief", "手帕"],
+        ["handle (1) (2)", "把手；處理"], ["handsome", "英俊的"], ["hang", "懸掛"], ["hanger", "衣架"],
+        ["hardly", "幾乎不"], ["hateful", "可恨的"], ["healthy", "健康的"], ["heater", "暖氣機"],
+        ["height", "高度"], ["helpful", "有幫助的"], ["hen", "母雞"], ["hero/heroine", "英雄/女英雄"],
+        ["hide", "躲藏"], ["highway", "公路"], ["hip", "臀部"], ["hippopotamus/hippo", "河馬"],
+        ["hire", "雇用"], ["hobby", "嗜好"], ["holder", "持有者；支架"], ["homesick", "想家的"],
+        ["honest", "誠實的"], ["honey", "蜂蜜；親愛的"], ["hop", "單腳跳"], ["hospital", "醫院"],
+        ["host (1)/hostess", "主人/女主人"], ["hotel", "旅館"], ["however", "然而"], ["hum", "哼唱"],
+        ["humble", "謙虛的"], ["humid", "潮濕的"], ["humor", "幽默"], ["hunger", "飢餓"],
+        ["hunt", "打獵"], ["hunter", "獵人"], ["hurry", "趕快"], ["ignore", "忽視"],
+        ["ill", "生病的"], ["imagine", "想像"], ["importance", "重要性"], ["improve(ment)", "改善"],
+        ["include", "包括"], ["income", "收入"], ["increase", "增加"], ["independence", "獨立"],
+        ["independent", "獨立的"], ["indicate", "指出"], ["industry", "工業；產業"], ["influence", "影響"],
+        ["ink", "墨水"], ["insect", "昆蟲"], ["insist", "堅持"], ["instance", "例子"],
+        ["instant", "立即的"], ["instrument", "儀器；樂器"], ["international", "國際的"], ["interview", "面試；採訪"],
+        ["introduce", "介紹"], ["invent", "發明"], ["invitation", "邀請函"], ["invite", "邀請"],
+        ["island", "島嶼"], ["item", "項目"], ["jacket", "夾克"], ["jam (2)", "果醬；塞車"],
+        ["jazz", "爵士樂"], ["jeans", "牛仔褲"], ["jeep", "吉普車"], ["jog", "慢跑"],
+        ["joint", "關節；接合處"], ["judge (1) (2)", "法官；判斷"], ["juicy", "多汁的"], ["ketchup/catsup", "番茄醬"],
+        ["kindergarten", "幼稚園"], ["kingdom", "王國"], ["knock", "敲"], ["knowledge", "知識"],
+        ["koala", "無尾熊"], ["ladybug/ladybird", "瓢蟲"], ["lane", "巷子；車道"], ["language", "語言"],
+        ["lantern", "燈籠"], ["lap", "大腿；一圈"], ["latest", "最新的"], ["lawyer", "律師"],
+        ["leadership", "領導力"], ["legal", "合法的"], ["lemon", "檸檬"], ["lemonade", "檸檬水"],
+        ["lend", "借出"], ["length", "長度"], ["leopard", "豹"], ["lettuce", "萵苣"],
+        ["library", "圖書館"], ["lick", "舔"], ["lid", "蓋子"], ["lightning", "閃電"],
+        ["limit", "限制"], ["link", "連結"], ["liquid", "液體"], ["listener", "聽眾"],
+        ["loaf", "一條(麵包)"], ["local", "當地的"], ["locate", "位於；找出"], ["lock", "鎖"],
+        ["log", "原木；紀錄"], ["lone", "孤單的"], ["lonely", "寂寞的"], ["lose", "輸；遺失"],
+        ["loser", "輸家"], ["loss", "損失"], ["lovely", "可愛的"], ["lover", "情人"],
+        ["lower", "降低；較低的"], ["luck", "運氣"], ["magazine", "雜誌"], ["magic", "魔術"],
+        ["magician", "魔術師"], ["main", "主要的"], ["maintain", "維持"], ["male", "男性"],
+        ["Mandarin", "中文；普通話"], ["mango", "芒果"], ["manner", "禮貌；方式"], ["mark", "記號；分數"],
+        ["marriage", "婚姻"], ["mask", "面具；口罩"], ["mass", "團塊；群眾"], ["mat", "墊子"],
+        ["match (2)", "相配"], ["mate", "伴侶"], ["material (1)", "材料"], ["meal", "一餐"],
+        ["meaning", "意義"], ["means", "手段"], ["measurable", "可測量的"], ["measure (1) (ment)", "測量"],
+        ["medicine", "藥；醫學"], ["meeting", "會議"], ["melody", "旋律"], ["melon", "甜瓜"],
+        ["member", "成員"], ["memory", "記憶"], ["menu", "菜單"], ["message", "訊息"],
+        ["metal", "金屬"], ["meter", "公尺"], ["method", "方法"], ["military", "軍事的"],
+        ["million", "百萬"], ["mine (1) (2)", "礦坑；我的(東西)"], ["minus", "減"], ["mirror", "鏡子"],
+        ["mix", "混合"], ["model", "模型；模特兒"], ["modern", "現代的"], ["monster", "怪獸"],
+        ["mosquito", "蚊子"], ["moth", "飛蛾"], ["motion", "動作"], ["motorcycle", "機車"],
+        ["movable", "可移動的"], ["MRT", "捷運"], ["mule", "騾子"], ["multiply", "乘；倍增"],
+        ["museum", "博物館"], ["musician", "音樂家"], ["nail (1) (2)", "指甲；釘子"], ["naked", "裸體的"],
+        ["napkin", "餐巾"], ["narrow", "狹窄的"], ["national", "國家的"], ["natural", "自然的"],
+        ["naughty", "頑皮的"], ["nearby", "附近的"], ["nearly", "幾乎"], ["neat", "整潔的"],
+        ["necessary", "必要的"], ["necklace", "項鍊"], ["needle", "針"], ["negative", "負面的"],
+        ["neighbor", "鄰居"], ["neither", "兩者皆非"], ["nephew", "姪子；外甥"], ["nest", "巢"],
+        ["net", "網子"], ["niece", "姪女；外甥女"], ["nobody", "沒人"], ["nod", "點頭"],
+        ["none", "沒有一個"], ["noodle", "麵"], ["northern", "北方的"], ["notebook", "筆記本"],
+        ["novel (1) (2)", "小說；新奇的"], ["nut", "堅果"], ["obey", "遵守"], ["object (1) (2)", "物體；反對"],
+        ["occur", "發生"], ["offer", "提供"], ["official", "官方的"], ["omit", "省略"],
+        ["onion", "洋蔥"], ["operate", "操作；開刀"], ["opinion", "意見"], ["ordinary", "普通的"],
+        ["organ", "器官；管風琴"], ["organization", "組織"], ["organize", "組織；安排"], ["oven", "烤箱"],
+        ["overpass", "天橋"], ["overseas", "海外的"], ["owl", "貓頭鷹"], ["owner", "擁有者"],
+        ["ox", "公牛"], ["pack", "打包"], ["package", "包裹"], ["pain", "疼痛"],
+        ["painful", "痛苦的"], ["painter", "畫家"], ["painting", "繪畫"], ["pajamas", "睡衣"],
+        ["palm", "手掌；棕櫚樹"], ["pan", "平底鍋"], ["panda", "熊貓"], ["papaya", "木瓜"],
+        ["pardon", "原諒"], ["parrot", "鸚鵡"], ["particular", "特定的"], ["partner", "夥伴"],
+        ["passenger", "乘客"], ["paste", "漿糊；貼上"], ["pat", "輕拍"], ["path", "小徑"],
+        ["patient (1) (2)", "有耐心的；病人"], ["pattern", "圖案；模式"], ["peace", "和平"], ["peaceful", "和平的"],
+        ["peach", "桃子"], ["peanut", "花生"], ["pear", "梨子"], ["penguin", "企鵝"],
+        ["pepper", "胡椒"], ["per", "每一"], ["perfect", "完美的"], ["period", "時期；句點"],
+        ["personal", "個人的"], ["photograph/photo", "照片"], ["photographer", "攝影師"], ["phrase", "片語"],
+        ["pick", "挑選；摘"], ["picnic", "野餐"], ["pigeon", "鴿子"], ["pile", "一堆"],
+        ["pillow", "枕頭"], ["pin", "大頭針"], ["pineapple", "鳳梨"], ["ping-pong", "桌球"],
+        ["pink", "粉紅色"], ["pipe", "管子；煙斗"], ["pitch", "投球；音高"], ["pizza", "披薩"],
+        ["plain (1) (2)", "平原；樸素的"], ["planet", "行星"], ["plate", "盤子"], ["platform", "月台"],
+        ["playful", "愛玩的"], ["pleasant", "令人愉快的"], ["pleasure", "榮幸；樂趣"], ["plus", "加"],
+        ["poem", "詩"], ["poet", "詩人"], ["poison", "毒藥"], ["policy", "政策"],
+        ["polite", "有禮貌的"], ["popular", "受歡迎的"], ["population", "人口"], ["pork", "豬肉"],
+        ["port", "港口"], ["pose", "姿勢"], ["positive", "正面的"], ["possibility", "可能性"],
+        ["post (1) (2) (3)", "郵寄；職位；柱子"], ["postcard", "明信片"], ["pot", "鍋子"], ["potato", "馬鈴薯"],
+        ["pound (1) (2)", "磅；搥打"], ["powerful", "強大的"], ["praise", "讚美"], ["pray", "祈禱"],
+        ["prefer", "偏好"], ["presence", "出席；存在"], ["present (1) (2) (3)", "禮物；現在；呈現"], ["president", "總統；校長"],
+        ["press (1) (2)", "按壓；新聞界"], ["pride", "驕傲"], ["prince", "王子"], ["princess", "公主"],
+        ["principal (1) (2)", "主要的；校長"], ["principle", "原則"], ["printer", "印表機"], ["prison", "監獄"],
+        ["prisoner", "囚犯"], ["private", "私人的"], ["prize", "獎品"], ["produce", "生產"],
+        ["producer", "生產者；製作人"], ["progress", "進步"], ["project (1) (2)", "專案；投射"], ["promise", "承諾"],
+        ["pronounce", "發音"], ["propose", "提議；求婚"], ["protect", "保護"], ["proud", "驕傲的"],
+        ["provide", "提供"], ["pudding", "布丁"], ["pump", "幫浦"], ["pumpkin", "南瓜"],
+        ["punish(ment)", "處罰"], ["pupil", "小學生；瞳孔"], ["puppet", "木偶"], ["puppy", "小狗"],
+        ["purse", "錢包(女用)"], ["puzzle", "謎題"], ["quality", "品質"], ["quantity", "數量"],
+        ["quarter", "四分之一；一刻"], ["quit", "戒除；放棄"], ["quiz", "小考"], ["rabbit", "兔子"],
+        ["rainy", "下雨的"], ["range", "範圍"], ["rapid", "快速的"], ["rare", "稀有的"],
+        ["rather", "寧願；相當"], ["reality", "現實"], ["realize", "了解；實現"], ["recent", "最近的"],
+        ["record (1) (2)", "記錄；唱片"], ["rectangle", "長方形"], ["refrigerator", "冰箱"], ["refuse", "拒絕"],
+        ["regard", "認為；尊重"], ["region", "地區"], ["regular", "規律的"], ["reject", "拒絕"],
+        ["relation", "關係"], ["relationship", "人際關係"], ["repeat", "重複"], ["reply", "回覆"],
+        ["reporter", "記者"], ["require(ment)", "要求"], ["respect", "尊敬"], ["responsible", "負責任的"],
+        ["restaurant", "餐廳"], ["restroom", "洗手間"], ["result", "結果"], ["review", "複習；評論"],
+        ["riches", "財富"], ["rock (2)", "搖滾；岩石"], ["rocky", "岩石多"], ["role", "角色"],
+        ["royal", "皇家的"], ["rude", "無禮的"], ["ruler", "尺；統治者"], ["runner", "跑者"],
+        ["rush", "匆忙"], ["safety", "安全"], ["sailor", "水手"], ["salad", "沙拉"],
+        ["salty", "鹹的"], ["sample", "樣品"], ["sandwich", "三明治"], ["satisfy", "使滿意"],
+        ["sauce", "醬汁"], ["science", "科學"], ["scientist", "科學家"], ["scissors", "剪刀"],
+        ["score", "分數"], ["screen", "螢幕"], ["search", "搜尋"], ["secret", "秘密"],
+        ["secretary", "秘書"], ["section", "部分；區域"], ["select", "挑選"], ["selection", "選擇"],
+        ["semester", "學期"], ["separate", "分開的"], ["serious", "嚴肅的"], ["servant", "僕人"],
+        ["settle(ment)", "解決；定居"], ["share", "分享"], ["shelf", "架子"], ["shell", "貝殼"],
+        ["shock", "震驚"], ["shoot", "射擊"], ["shorts", "短褲"], ["shower", "淋浴"],
+        ["shrimp", "蝦子"], ["sidewalk", "人行道"], ["sign", "標誌；簽名"], ["silence", "沈默"],
+        ["silent", "安靜的"], ["silk", "絲綢"], ["similar", "相似的"], ["simply", "僅僅；簡單地"],
+        ["single", "單一的；單身的"], ["sink (1) (2)", "水槽；下沈"], ["skillful/skilled", "熟練的"], ["skinny", "極瘦的"],
+        ["skirt", "裙子"], ["sleepy", "想睡的"], ["slender", "苗條的"], ["slide", "滑動；溜滑梯"],
+        ["slim", "苗條的"], ["slip", "滑倒"], ["slipper(s)", "拖鞋"], ["snack", "點心"],
+        ["snail", "蝸牛"], ["snowy", "下雪的"], ["soccer", "足球"], ["social", "社會的；社交的"],
+        ["society", "社會"], ["sock(s)", "襪子"], ["soldier", "士兵"], ["solution", "解決方法"],
+        ["solve", "解決"], ["somebody", "某人"], ["somewhere", "某處"], ["sort", "種類；分類"],
+        ["source", "來源"], ["southern", "南方的"], ["soybean", "黃豆"], ["speaker", "演講者；喇叭"],
+        ["speed", "速度"], ["spelling", "拼字"], ["spider", "蜘蛛"], ["spinach", "菠菜"],
+        ["spirit", "精神；靈魂"], ["spot", "斑點；地點"], ["spread", "散布；塗抹"], ["spring (2)", "彈簧"],
+        ["square", "正方形；廣場"], ["squirrel", "松鼠"], ["stage", "舞台；階段"], ["stamp", "郵票"],
+        ["standard", "標準"], ["steak", "牛排"], ["steal", "偷竊"], ["steam", "蒸氣"],
+        ["steel", "鋼鐵"], ["stick (1) (2)", "棍子；黏貼"], ["stomach", "胃"], ["storm", "暴風雨"],
+        ["stove", "爐子"], ["straight", "直的"], ["stranger", "陌生人"], ["straw", "稻草；吸管"],
+        ["strawberry", "草莓"], ["stream", "溪流"], ["stress", "壓力"], ["stretch", "伸展"],
+        ["strict", "嚴格的"], ["strike", "罷工；打擊"], ["string", "細繩"], ["struggle", "掙扎；奮鬥"],
+        ["subject", "科目；主題"], ["subtract", "減去"], ["subway", "地鐵"], ["succeed", "成功"],
+        ["success", "成功(名詞)"], ["successful", "成功的"], ["sudden", "突然的"], ["suit (1) (2)", "西裝；適合"],
+        ["sunny", "晴朗的"], ["supermarket", "超市"], ["supply", "供給"], ["support", "支持"],
+        ["surface", "表面"], ["survive", "存活"], ["swallow (1) (2)", "吞嚥；燕子"], ["swan", "天鵝"],
+        ["sweater", "毛衣"], ["sweep", "掃"], ["swing", "搖擺；鞦韆"], ["symbol", "象徵"],
+        ["talent", "才華"], ["talkative", "健談的"], ["tangerine", "橘子"], ["tank", "坦克；水槽"],
+        ["tape", "膠帶；錄音帶"], ["target", "目標"], ["task", "任務"], ["tasty", "好吃的"],
+        ["team", "團隊"], ["tear (1) (2)", "眼淚；撕裂"], ["teen(s)", "青少年時期"], ["teenage", "青少年的"],
+        ["teenager", "青少年"], ["telephone/phone", "電話"], ["television/TV", "電視"], ["temple", "寺廟"],
+        ["tennis", "網球"], ["tent", "帳篷"], ["term", "術語；學期"], ["test", "考試"],
+        ["terrible", "可怕的"], ["terrific", "極好的"], ["textbook", "教科書"], ["theater", "戲院"],
+        ["therefore", "因此"], ["thick", "厚的"], ["thief", "小偷"], ["thin", "瘦的；薄的"],
+        ["thirsty", "口渴的"], ["throat", "喉嚨"], ["through", "穿過"], ["throughout", "遍及"],
+        ["thumb", "拇指"], ["thunder", "雷"], ["tip", "尖端；小費"], ["title", "標題"],
+        ["toast", "吐司；敬酒"], ["toe", "腳趾"], ["tofu", "豆腐"], ["toilet", "廁所"],
+        ["tomato", "番茄"], ["tongue", "舌頭"], ["tooth", "牙齒"], ["topic", "話題"],
+        ["tour", "旅遊"], ["towel", "毛巾"], ["tower", "塔"], ["track", "軌道；追蹤"],
+        ["trade", "貿易"], ["tradition", "傳統"], ["traditional", "傳統的"], ["traffic", "交通"],
+        ["trap", "陷阱"], ["travel", "旅行"], ["treasure", "寶藏"], ["treat (1) (ment) (2)", "對待；請客"],
+        ["trial", "審判；試驗"], ["triangle", "三角形"], ["trick", "把戲"], ["trousers", "長褲"],
+        ["truck", "卡車"], ["trumpet", "小號"], ["trust", "信任"], ["truth", "真相"],
+        ["tube", "管子"], ["tunnel", "隧道"], ["turkey", "火雞"], ["turtle", "烏龜"],
+        ["type (1) (2)", "類型；打字"], ["typhoon", "颱風"], ["ugly", "醜陋的"], ["umbrella", "雨傘"],
+        ["underwear", "內衣"], ["uniform", "制服"], ["upon", "在...之上"], ["upper", "上面的"],
+        ["used", "習慣的；舊的"], ["used to (1) (2)", "過去經常"], ["user", "使用者"], ["usual", "通常的"],
+        ["vacation", "假期"], ["valley", "山谷"], ["value", "價值"], ["victory", "勝利"],
+        ["video", "影片"], ["village", "村莊"], ["violin", "小提琴"], ["visitor", "訪客"],
+        ["vocabulary", "字彙"], ["volleyball", "排球"], ["vote", "投票"], ["voter", "投票者"],
+        ["waist", "腰"], ["waiter/waitress", "服務生"], ["wake", "醒來"], ["wallet", "皮夾"],
+        ["waterfall", "瀑布"], ["watermelon", "西瓜"], ["wave", "海浪；揮手"], ["weapon", "武器"],
+        ["wed", "結婚"], ["weekday", "工作日"], ["western", "西方的"], ["wet", "濕的"],
+        ["whale", "鯨魚"], ["whatever", "無論什麼"], ["wheel", "輪子"], ["whenever", "無論何時"],
+        ["wherever", "無論何地"], ["whisper", "耳語"], ["whoever", "無論是誰"], ["widen", "加寬"],
+        ["width", "寬度"], ["wild", "野生的"], ["willing", "願意的"], ["windy", "風大的"],
+        ["wing", "翅膀"], ["winner", "贏家"], ["wire", "電線"], ["wise", "明智的"],
+        ["within", "在...之內"], ["without", "沒有"], ["wolf", "狼"], ["wonder", "想知道；奇蹟"],
+        ["wonderful", "美好的"], ["wooden", "木製的"], ["wool", "羊毛"], ["worth", "值得的"],
+        ["wound", "傷口"], ["yard", "庭院；碼"], ["youth", "青春；年輕人"], ["zebra", "斑馬"]
+    ];
+
+    // ==========================================
+    // 3. 待填充資料區 (請將後續資料貼入此處)
+    // ==========================================
+
+    const dataLevel3 = [
+        ["aboard", "在(船、飛機、車)上"], ["acceptable", "可接受的"], ["accident", "意外；事故"], ["account", "帳戶；解釋"],
+    ["accurate", "準確的"], ["ache", "疼痛"], ["achieve(ment)", "達成；成就"], ["activity", "活動"],
+    ["actual", "實際的"], ["additional", "額外的"], ["admire", "欽佩；欣賞"], ["admit", "承認"],
+    ["adopt", "採用；領養"], ["advanced", "先進的；高級的"], ["advantage", "優點；優勢"], ["adventure", "冒險"],
+    ["advertise", "登廣告"], ["advice", "建議(名詞)"], ["advise", "建議(動詞)"], ["adviser/advisor", "顧問"],
+    ["affect", "影響"], ["afford", "負擔得起"], ["afterward(s)", "之後"], ["agriculture", "農業"],
+    ["air-conditioner", "冷氣機"], ["alley", "小巷"], ["amaze(ment)", "使驚訝；驚奇"], ["ambassador", "大使"],
+    ["ambition", "野心；抱負"], ["angel", "天使"], ["angle", "角度"], ["announce(ment)", "宣布"],
+    ["apart", "分開地"], ["apparent", "明顯的"], ["appeal", "吸引；懇求"], ["appreciate", "感激；欣賞"],
+    ["approach", "接近；方法"], ["approve", "贊成；批准"], ["aquarium", "水族館"], ["arithmetic", "算術"],
+    ["arrival", "到達"], ["ash", "灰燼"], ["aside", "在旁邊"], ["assist", "協助"],
+    ["athlete", "運動員"], ["attempt", "試圖；嘗試"], ["attitude", "態度"], ["attract", "吸引"],
+    ["attractive", "有吸引力的"], ["audience", "觀眾"], ["author", "作者"], ["automatic", "自動的"],
+    ["automobile/auto", "汽車"], ["available", "可用的；有空的"], ["avenue", "大道"], ["average", "平均"],
+    ["awake", "清醒的"], ["awaken", "喚醒"], ["award", "獎品；頒發"], ["aware", "意識到的"],
+    ["awful", "糟糕的"], ["ax/axe", "斧頭"], ["background", "背景"], ["bacon", "培根"],
+    ["bacteria", "細菌"], ["badly", "壞地；非常"], ["badminton", "羽毛球"], ["baggage", "行李"],
+    ["bait", "餌"], ["balance", "平衡"], ["bandage", "繃帶"], ["bang", "重擊聲"],
+    ["bare", "赤裸的"], ["barely", "僅僅；勉強"], ["barn", "穀倉"], ["barrel", "桶"],
+    ["bay", "海灣"], ["beam (1)", "光束；橫樑"], ["beast", "野獸"], ["beggar", "乞丐"],
+    ["behave", "表現；舉止"], ["being", "存在；生物"], ["belly/stomach", "肚子；胃"], ["beneath", "在...之下"],
+    ["benefit", "利益；有好處"], ["berry", "莓果"], ["Bible/bible", "聖經"], ["billion", "十億"],
+    ["bingo", "賓果遊戲"], ["biscuit", "餅乾"], ["blame", "責怪"], ["blanket", "毛毯"],
+    ["bleed", "流血"], ["bless", "祝福"], ["blouse", "女襯衫"], ["bold", "大膽的"],
+    ["boot", "靴子"], ["border", "邊界"], ["bore", "使厭煩"], ["brake", "煞車"],
+    ["brass", "黃銅"], ["bravery", "勇敢"], ["breast", "胸部；乳房"], ["breath", "呼吸(名詞)"],
+    ["breathe", "呼吸(動詞)"], ["breeze", "微風"], ["bride", "新娘"], ["brilliant", "光輝的；傑出的"],
+    ["brook", "小溪"], ["broom", "掃把"], ["brow(s)", "眉毛；額頭"], ["bubble", "氣泡"],
+    ["bucket/pail", "水桶"], ["bud", "芽；花苞"], ["budget", "預算"], ["buffalo", "水牛"],
+    ["buffet", "自助餐"], ["bulb", "電燈泡"], ["bull", "公牛"], ["bullet", "子彈"],
+    ["bump", "撞擊"], ["bunch", "一束；一群"], ["burden", "負擔"], ["burglar", "竊賊"],
+    ["bury", "埋葬"], ["bush", "灌木"], ["buzz", "嗡嗡聲"], ["cabin", "小木屋；機艙"],
+    ["campus", "校園"], ["cane", "手杖；藤條"], ["canoe", "獨木舟"], ["canyon", "峽谷"],
+    ["capable", "有能力的"], ["capital", "首都；資本；大寫"], ["capture", "捕獲"], ["carpenter", "木匠"],
+    ["carriage", "馬車"], ["cast", "投擲；鑄造；卡司"], ["casual", "非正式的；休閒的"], ["caterpillar", "毛毛蟲"],
+    ["cattle", "牛(總稱)"], ["celebrate", "慶祝"], ["centimeter", "公分"], ["ceramic", "陶瓷的"],
+    ["chain", "鏈子；連鎖"], ["challenge", "挑戰"], ["champion", "冠軍"], ["changeable", "易變的"],
+    ["channel", "頻道；海峽"], ["chapter", "章節"], ["charm", "魅力；符咒"], ["chat", "閒聊"],
+    ["cheek", "臉頰"], ["cheer", "歡呼"], ["cheerful", "興高采烈的"], ["cheese", "起司"],
+    ["cherry", "櫻桃"], ["chest", "胸膛；箱子"], ["chew", "咀嚼"], ["childhood", "童年"],
+    ["chill", "寒冷"], ["chilly", "寒冷的"], ["chimney", "煙囪"], ["chip", "晶片；洋芋片"],
+    ["choke", "窒息；噎住"], ["chop", "砍；剁"], ["cigarette", "香菸"], ["circus", "馬戲團"],
+    ["civil", "公民的；文明的"], ["classical", "古典的"], ["click", "點擊；喀嚓聲"], ["client", "客戶"],
+    ["clinic", "診所"], ["clip", "修剪；迴紋針"], ["clue", "線索"], ["cocktail", "雞尾酒"],
+    ["coconut", "椰子"], ["collar", "衣領"], ["collection", "收集品"], ["college", "大學；學院"],
+    ["colony", "殖民地"], ["column", "圓柱；專欄"], ["combine", "結合"], ["comfort", "安慰；舒適"],
+    ["comma", "逗號"], ["command", "命令"], ["commercial", "商業的；廣告"], ["committee", "委員會"],
+    ["communicate", "溝通"], ["comparison", "比較"], ["compete", "競爭"], ["complaint", "抱怨"],
+    ["complex", "複雜的"], ["concern", "關心；關於"], ["concert", "音樂會"], ["conclude", "下結論；結束"],
+    ["conclusion", "結論"], ["condition", "狀況；條件"], ["cone", "圓錐體"], ["confident", "有信心的"],
+    ["confuse", "使困惑"], ["connect", "連接"], ["connection", "聯接；關係"], ["conscious", "有意識的"],
+    ["considerable", "相當大的"], ["consideration", "考慮；體貼"], ["constant", "持續的"], ["continent", "大陸；洲"],
+    ["contract", "合約"], ["couch", "長沙發"], ["countable", "可數的"], ["coward", "懦夫"],
+    ["cradle", "搖籃"], ["crash", "墜毀；撞擊"], ["crawl", "爬行"], ["creative", "有創意的"],
+    ["creator", "創造者"], ["creature", "生物"], ["credit", "信用；學分"], ["creep", "躡手躡腳地走"],
+    ["crew", "全體工作人員"], ["cricket", "蟋蟀；板球"], ["criminal", "罪犯"], ["crisp/crispy", "酥脆的"],
+    ["crown", "皇冠"], ["crunchy", "發出喀吱聲的"], ["crutch", "拐杖"], ["cultural", "文化的"],
+    ["cupboard", "碗櫃"], ["current", "目前的；水流/電流"], ["cycle", "循環；週期"], ["dairy", "乳製品"],
+    ["dam", "水壩"], ["dare", "敢"], ["darling", "親愛的"], ["dash", "猛衝"],
+    ["deafen", "使聾"], ["dealer", "商人"], ["decade", "十年"], ["deck", "甲板"],
+    ["deed", "行為"], ["deepen", "加深"], ["define", "下定義"], ["definition", "定義"],
+    ["delivery", "遞送"], ["democracy", "民主"], ["democratic", "民主的"], ["deposit", "存款；沈積物"],
+    ["description", "描述"], ["designer", "設計師"], ["desirable", "合意的"], ["destroy", "破壞"],
+    ["detail", "細節"], ["determine", "決定；下決心"], ["devil", "惡魔"], ["dialogue", "對話"],
+    ["diet", "飲食；節食"], ["diligent", "勤勉的"], ["dim", "昏暗的"], ["dime", "一角硬幣"],
+    ["dine", "用餐"], ["dip", "浸；沾"], ["dirt", "泥土；髒物"], ["disappoint(ment)", "失望"],
+    ["disco", "迪斯可"], ["discount", "折扣"], ["discovery", "發現"], ["disease", "疾病"],
+    ["disk/disc", "磁片；圓盤"], ["dislike", "不喜歡"], ["ditch", "溝渠"], ["dive", "潛水；跳水"],
+    ["dock", "碼頭"], ["dodge", "閃躲"], ["domestic", "家庭的；國內的"], ["dose", "劑量"],
+    ["doubtful", "懷疑的"], ["drain", "排出；排水管"], ["dramatic", "戲劇性的"], ["drip", "滴下"],
+    ["drown", "淹死"], ["drowsy", "昏昏欲睡的"], ["drunk", "喝醉的"], ["due", "到期的；應支付的"],
+    ["dump", "傾倒；垃圾場"], ["dust", "灰塵"], ["eager", "渴望的"], ["earnings", "收入"],
+    ["echo", "回音"], ["edit", "編輯"], ["edition", "版本"], ["editor", "編輯者"],
+    ["educate", "教育"], ["educational", "教育的"], ["efficient", "有效率的"], ["elbow", "手肘"],
+    ["elderly", "年長的"], ["election", "選舉"], ["electric", "電的"], ["electricity", "電力"],
+    ["electronic", "電子的"], ["emergency", "緊急情況"], ["emperor", "皇帝"], ["emphasize", "強調"],
+    ["employ(ment)", "雇用"], ["employee", "員工"], ["employer", "雇主"], ["empty", "空的"],
+    ["enable", "使能夠"], ["energetic", "精力充沛的"], ["engage(ment)", "訂婚；從事"], ["engine", "引擎"],
+    ["engineer", "工程師"], ["enjoyable", "愉快的"], ["entry", "進入；入口"], ["environmental", "環境的"],
+    ["envy", "羨慕；嫉妒"], ["erase", "擦掉"], ["escape", "逃跑"], ["evil", "邪惡的"],
+    ["excellence", "傑出"], ["exchange", "交換"], ["exhibition", "展覽"], ["existence", "存在"],
+    ["exit", "出口"], ["expectation", "期待"], ["expense", "花費"], ["experiment", "實驗"],
+    ["explode", "爆炸"], ["export", "出口"], ["expression", "表情；措辭"], ["expressive", "表情豐富的"],
+    ["extreme", "極端的"], ["fable", "寓言"], ["factor", "因素"], ["fade", "褪色；凋謝"],
+    ["faint", "昏倒；微弱的"], ["fairly", "相當地；公正地"], ["fairy", "仙子"], ["faith", "信心；信仰"],
+    ["fake", "假的"], ["familiar", "熟悉的"], ["fan (2)/fanatic", "狂熱者"], ["fancy", "花俏的；幻想"],
+    ["fare", "票價"], ["farther", "更遠的"], ["fashion", "時尚"], ["fashionable", "流行的"],
+    ["fasten", "繫緊"], ["fate", "命運"], ["faucet/tap", "水龍頭"], ["fax", "傳真"],
+    ["feather", "羽毛"], ["feature", "特徵"], ["file", "檔案；銼刀"], ["firework", "煙火"],
+    ["fist", "拳頭"], ["flame", "火焰"], ["flavor", "口味"], ["flea", "跳蚤"],
+    ["flesh", "肉(人或動物)"], ["float", "漂浮"], ["flock", "群"], ["fold", "摺疊"],
+    ["folk", "民間的；人們"], ["follower", "追隨者"], ["fond", "喜愛的"], ["forehead", "額頭"],
+    ["forever", "永遠"], ["forth", "向外；向前"], ["fortune", "財富；運氣"], ["found", "建立"],
+    ["fountain", "噴水池"], ["freeze", "結冰"], ["frequent", "頻繁的"], ["friendship", "友誼"],
+    ["frustrate", "使挫敗"], ["fry", "油炸"], ["fund", "資金"], ["fur", "毛皮"],
+    ["furniture", "傢俱"], ["gallon", "加侖"], ["gamble", "賭博"], ["gang", "幫派"],
+    ["gap", "裂縫；差距"], ["garlic", "大蒜"], ["gasoline/gas", "汽油"], ["gesture", "手勢"],
+    ["glance", "瞥見"], ["global", "全球的"], ["glory", "光榮"], ["glow", "發光"],
+    ["gossip", "八卦"], ["governor", "州長；總督"], ["gown", "禮服"], ["grab", "抓取"],
+    ["gradual", "逐漸的"], ["graduate", "畢業"], ["grain", "穀物"], ["gram", "公克"],
+    ["grasp", "抓牢；理解"], ["grasshopper", "蚱蜢"], ["greenhouse", "溫室"], ["grin", "露齒笑"],
+    ["grocery", "雜貨"], ["guardian", "監護人"], ["guidance", "指導"], ["gum", "口香糖；牙齦"],
+    ["gymnasium/gym", "體育館"], ["hairdresser", "美髮師"], ["hallway", "走廊"], ["handful", "一把；少數"],
+    ["handy", "便利的；手邊的"], ["harbor", "港口"], ["harm", "傷害"], ["harmful", "有害的"],
+    ["harvest", "收穫"], ["hasty", "匆忙的"], ["hatch", "孵化"], ["hawk", "老鷹"],
+    ["hay", "乾草"], ["headline", "標題"], ["headquarters", "總部"], ["heal", "治癒"],
+    ["heap", "一堆"], ["heaven", "天堂"], ["heel", "腳後跟"], ["hell", "地獄"],
+    ["helmet", "頭盔；安全帽"], ["hesitate", "猶豫"], ["hike", "健行"], ["hint", "暗示"],
+    ["historian", "歷史學家"], ["historic", "有歷史意義的"], ["historical", "歷史的"], ["hive", "蜂窩"],
+    ["hollow", "中空的"], ["holy", "神聖的"], ["hometown", "家鄉"], ["honesty", "誠實"],
+    ["honor", "榮譽"], ["horn", "角；喇叭"], ["horrible", "可怕的"], ["horror", "恐懼"],
+    ["hourly", "每小時的"], ["housekeeper", "管家"], ["hug", "擁抱"], ["humorous", "幽默的"],
+    ["hush", "噓(安靜)"], ["hut", "簡陋小屋"], ["icy", "冰冷的"], ["ideal", "理想的"],
+    ["identity", "身分"], ["ignorance", "無知"], ["image", "影像；形象"], ["imagination", "想像力"],
+    ["immediate", "立即的"], ["import", "進口"], ["impress", "使印象深刻"], ["impressive", "令人印象深刻的"],
+    ["indeed", "的確"], ["individual", "個人的；個體"], ["indoor", "室內的"], ["indoors", "在室內"],
+    ["industrial", "工業的"], ["inferior", "較差的"], ["inform", "通知"], ["injure", "傷害"],
+    ["injury", "受傷"], ["inn", "旅店"], ["inner", "內部的"], ["innocent", "無辜的"],
+    ["inspect", "檢查"], ["inspector", "檢查員"], ["instead", "替代"], ["instruction", "指示；教學"],
+    ["internal", "內部的"], ["interrupt", "打斷"], ["introduction", "介紹"], ["inventor", "發明家"],
+    ["investigate", "調查"], ["ivory", "象牙"], ["jail", "監獄"], ["jar", "罐子"],
+    ["jaw", "下顎"], ["jealous", "嫉妒的"], ["jelly", "果凍"], ["jet", "噴射機"],
+    ["jewel", "寶石"], ["jewelry", "珠寶"], ["journal", "期刊；日誌"], ["journey", "旅程"],
+    ["joyful", "喜悅的"], ["jungle", "叢林"], ["junk", "垃圾"], ["justice", "正義"],
+    ["kangaroo", "袋鼠"], ["kettle", "水壺"], ["keyboard", "鍵盤"], ["kidney", "腎臟"],
+    ["kilogram/kg", "公斤"], ["kilometer/km", "公里"], ["kit", "成套工具"], ["kneel", "跪下"],
+    ["knight", "騎士"], ["knit", "編織"], ["knob", "門把"], ["knot", "結"],
+    ["label", "標籤"], ["lace", "蕾絲；鞋帶"], ["ladder", "梯子"], ["latter", "後者"],
+    ["laughter", "笑聲"], ["laundry", "洗衣店；待洗衣物"], ["lawn", "草坪"], ["leak", "漏"],
+    ["leap", "跳躍"], ["leather", "皮革"], ["leisure", "閒暇"], ["lengthen", "加長"],
+    ["lens", "鏡頭；透鏡"], ["liar", "騙子"], ["liberal", "開放的；自由主義的"], ["liberty", "自由"],
+    ["librarian", "圖書館員"], ["lifeboat", "救生艇"], ["lifeguard", "救生員"], ["lifetime", "一生"],
+    ["lighthouse", "燈塔"], ["limb", "肢體"], ["linen", "亞麻布"], ["lipstick", "口紅"],
+    ["litter", "垃圾"], ["lively", "充滿活力的"], ["liver", "肝臟"], ["load", "負荷；裝載"],
+    ["lobby", "大廳"], ["lobster", "龍蝦"], ["lollipop", "棒棒糖"], ["loose", "鬆的"],
+    ["loosen", "放鬆"], ["lord", "貴族；主"], ["loudspeaker", "擴音器"], ["luggage", "行李"],
+    ["lullaby", "搖籃曲"], ["lung", "肺"], ["magical", "魔力的"], ["magnet", "磁鐵"],
+    ["maid", "女僕"], ["major", "主要的；主修"], ["majority", "大多數"], ["mall", "購物中心"],
+    ["manage(ment)", "管理"], ["manageable", "易處理的"], ["manager", "經理"], ["mankind", "人類"],
+    ["manners", "禮貌"], ["marble", "大理石；彈珠"], ["march", "行軍；遊行"], ["marvelous", "極好的"],
+    ["mathematical", "數學的"], ["mathematics/math", "數學"], ["mature", "成熟的"], ["mayor", "市長"],
+    ["meadow", "草地"], ["meaningful", "有意義的"], ["meanwhile", "同時"], ["medal", "獎牌"],
+    ["medical", "醫學的"], ["medium/media", "媒體；媒介"], ["melt", "融化"], ["membership", "會員資格"],
+    ["memorize", "背誦"], ["mend", "修理"], ["mental", "心理的"], ["mention", "提及"],
+    ["merchant", "商人"], ["merry", "愉快的"], ["mess", "混亂"], ["microphone/mike", "麥克風"],
+    ["microwave", "微波爐"], ["might", "力量；可能"], ["mighty", "強大的"], ["mill", "磨坊；工廠"],
+    ["millionaire", "百萬富翁"], ["miner", "礦工"], ["minor", "次要的；未成年人"], ["minority", "少數"],
+    ["miracle", "奇蹟"], ["misery", "悲慘"], ["missile", "飛彈"], ["missing", "失蹤的"],
+    ["mission", "任務"], ["mist", "薄霧"], ["mixture", "混合物"], ["mob", "暴民"],
+    ["mobile", "可移動的"], ["moist", "潮濕的"], ["moisture", "濕氣"], ["monk", "僧侶"],
+    ["mood", "心情"], ["mop", "拖把"], ["moral", "道德的"], ["motel", "汽車旅館"],
+    ["motor", "馬達"], ["murder", "謀殺"], ["muscle", "肌肉"], ["mushroom", "蘑菇"],
+    ["musical", "音樂的；音樂劇"], ["mystery", "神秘"], ["nanny", "保母"], ["nap", "小睡"],
+    ["native", "本地的"], ["navy", "海軍"], ["necessity", "必需品"], ["necktie", "領帶"],
+    ["neighborhood", "鄰近地區"], ["nerve", "神經；勇氣"], ["nervous", "緊張的"], ["network", "網路"],
+    ["nickname", "綽號"], ["noble", "高尚的；貴族"], ["normal", "正常的"], ["novelist", "小說家"],
+    ["nun", "修女"], ["oak", "橡樹"], ["observe", "觀察；遵守"], ["obvious", "明顯的"],
+    ["occasion", "場合"], ["odd", "奇怪的；奇數的"], ["onto", "到...之上"], ["operator", "操作員"],
+    ["opportunity", "機會"], ["opposite", "相反的"], ["optimistic", "樂觀的"], ["origin", "起源"],
+    ["original", "最初的"], ["orphan", "孤兒"], ["ought to", "應該"], ["outdoor", "戶外的"],
+    ["outdoors", "在戶外"], ["outer", "外部的"], ["outline", "大綱；輪廓"], ["overcoat", "大衣"],
+    ["owe", "欠"], ["ownership", "所有權"], ["pad", "墊子"], ["pail", "桶"],
+    ["pal", "夥伴"], ["palace", "皇宮"], ["pale", "蒼白的"], ["pancake", "鬆餅"],
+    ["panic", "恐慌"], ["parade", "遊行"], ["paradise", "天堂"], ["parcel", "包裹"],
+    ["participate", "參加"], ["passage", "通道；段落"], ["passion", "熱情"], ["passport", "護照"],
+    ["password", "密碼"], ["patience", "耐心"], ["pause", "暫停"], ["pave(ment)", "鋪路(人行道)"],
+    ["paw", "爪子"], ["pay/salary/wage", "薪水"], ["pea", "豌豆"], ["peak", "山頂；高峰"],
+    ["pearl", "珍珠"], ["peel", "剝皮"], ["peep", "偷看"], ["penny", "便士"],
+    ["perform", "表演；執行"], ["performance", "表演；表現"], ["permission", "許可"], ["permit", "允許"],
+    ["personality", "個性"], ["persuade", "說服"], ["pest", "害蟲"], ["pickle", "醃漬物"],
+    ["pill", "藥丸"], ["pilot", "飛行員"], ["pine", "松樹"], ["pint", "品脫"],
+    ["pit", "坑"], ["pity", "同情；可惜"], ["plastic", "塑膠"], ["plenty", "豐富"],
+    ["plug", "插頭；塞子"], ["plum", "李子"], ["plumber", "水電工"], ["pole", "竿；極地"],
+    ["political", "政治的"], ["politician", "政客"], ["politics", "政治"], ["poll", "民意調查"],
+    ["pollute", "污染"], ["pony", "小馬"], ["pop (1)", "發出砰聲；流行"], ["pop/popular", "受歡迎的"],
+    ["porcelain/china", "瓷器"], ["portion", "一部分"], ["portrait", "肖像"], ["postage", "郵資"],
+    ["poster", "海報"], ["postpone(ment)", "延期"], ["pottery/ceramic", "陶器"], ["pour", "倒"],
+    ["poverty", "貧窮"], ["powder", "粉末"], ["practical", "實際的"], ["prayer", "禱告"],
+    ["precious", "珍貴的"], ["preparation", "準備"], ["pressure", "壓力"], ["pretend", "假裝"],
+    ["prevent", "預防"], ["previous", "先前的"], ["priest", "牧師"], ["primary", "主要的；初級的"],
+    ["probable", "可能的"], ["process", "過程"], ["product", "產品"], ["profit", "利潤"],
+    ["program", "節目；程式"], ["promote", "升遷；促銷"], ["proof", "證據"], ["proper", "適當的"],
+    ["property", "財產"], ["proposal", "提議；求婚"], ["protection", "保護"], ["protective", "保護的"],
+    ["pub", "酒吧"], ["punch", "重擊"], ["pure", "純粹的"], ["pursue", "追求"],
+    ["quarrel", "爭吵"], ["queer", "奇怪的"], ["quote", "引用"], ["racial", "種族的"],
+    ["radar", "雷達"], ["rag", "破布"], ["raisin", "葡萄乾"], ["rank", "等級"],
+    ["rate", "比率；速度"], ["raw", "生的"], ["ray", "光線"], ["razor", "刮鬍刀"],
+    ["react", "反應"], ["reaction", "反應(名詞)"], ["reasonable", "合理的"], ["receipt", "收據"],
+    ["receiver", "聽筒；接收者"], ["recognize", "認出；承認"], ["recorder", "錄音機"], ["recover", "恢復"],
+    ["reduce", "減少"], ["regional", "地區的"], ["regret", "後悔"], ["relate", "有關聯"],
+    ["relax", "放鬆"], ["release", "釋放；發行"], ["reliable", "可靠的"], ["relief", "解脫；救濟"],
+    ["religion", "宗教"], ["religious", "宗教的；虔誠的"], ["rely", "依靠"], ["remain", "保持；剩下"],
+    ["remind", "提醒"], ["remote", "遙遠的"], ["remove", "移除"], ["renew", "更新"],
+    ["rent", "租金"], ["repair", "修理"], ["replace(ment)", "取代"], ["represent", "代表"],
+    ["representative", "代表(人)"], ["republic", "共和國"], ["request", "要求"], ["reserve", "預約；保留"],
+    ["resist", "抵抗"], ["resource", "資源"], ["respond", "回應"], ["response", "回應(名詞)"],
+    ["responsibility", "責任"], ["restrict", "限制"], ["reveal", "揭露"], ["ribbon", "緞帶"],
+    ["rid", "擺脫"], ["riddle", "謎語"], ["ripe", "成熟的"], ["risk", "冒險"],
+    ["roar", "吼叫"], ["roast", "烤"], ["rob", "搶劫"], ["robber", "搶匪"],
+    ["robbery", "搶案"], ["robe", "長袍"], ["rocket", "火箭"], ["romantic", "浪漫的"],
+    ["rot", "腐爛"], ["rotten", "腐爛的"], ["rough", "粗糙的"], ["routine", "例行公事"],
+    ["rug", "小地毯"], ["rumor", "謠言"], ["rust", "生鏽"], ["rusty", "生鏽的"],
+    ["sack", "袋子；解雇"], ["sake", "緣故"], ["satisfactory", "令人滿意的"], ["saucer", "茶碟"],
+    ["sausage", "香腸"], ["saving(s)", "存款"], ["scale(s)", "規模；磅秤"], ["scarce", "缺乏的"],
+    ["scarecrow", "稻草人"], ["scarf", "圍巾"], ["scary", "可怕的"], ["scatter", "散布"],
+    ["schedule", "行程表"], ["scholar", "學者"], ["scholarship", "獎學金"], ["scientific", "科學的"],
+    ["scoop", "勺子；獨家新聞"], ["scout", "童子軍；偵查"], ["scream", "尖叫"], ["screw", "螺絲"],
+    ["scrub", "刷洗"], ["seal", "海豹；印章"], ["secondary", "次要的；中等的"], ["security", "安全"],
+    ["seek", "尋找"], ["seize", "抓住"], ["seldom", "很少"], ["sensible", "明智的"],
+    ["sensitive", "敏感的"], ["separation", "分離"], ["sew", "縫紉"], ["sex", "性別；性"],
+    ["sexual", "性的"], ["sexy", "性感的"], ["shade", "陰影"], ["shadow", "影子"],
+    ["shady", "蔭涼的"], ["shallow", "淺的"], ["shame", "羞恥"], ["shampoo", "洗髮精"],
+    ["shave", "刮鬍子"], ["shepherd", "牧羊人"], ["shiny", "閃亮的"], ["shorten", "縮短"],
+    ["shortly", "不久"], ["shovel", "鏟子"], ["shrink", "縮水"], ["sigh", "嘆氣"],
+    ["signal", "信號"], ["significant", "重要的"], ["similarity", "相似處"], ["sin", "罪"],
+    ["sincere", "真誠的"], ["sip", "啜飲"], ["situation", "情況"], ["skate", "溜冰"],
+    ["ski", "滑雪"], ["skip", "略過；跳"], ["skyscraper", "摩天大樓"], ["slave", "奴隸"],
+    ["sleeve", "袖子"], ["slice", "薄片"], ["slippery", "滑的"], ["slope", "斜坡"],
+    ["smooth", "平滑的"], ["snap", "折斷；快照"], ["solid", "固體的"], ["someday", "有朝一日"],
+    ["somehow", "不知何故"], ["sometime", "某個時候"], ["somewhat", "稍微"], ["sore", "痠痛的"],
+    ["sorrow", "悲傷"], ["spade", "鏟子；黑桃"], ["spaghetti", "義大利麵"], ["specific", "具體的"],
+    ["spice", "香料"], ["spill", "溢出"], ["spin", "旋轉"], ["spit", "吐口水"],
+    ["spite", "惡意"], ["splash", "濺"], ["spoil", "破壞；寵壞"], ["sprain", "扭傷"],
+    ["spray", "噴灑"], ["sprinkle", "撒"], ["spy", "間諜"], ["squeeze", "擠壓"],
+    ["stab", "刺"], ["stable", "穩定的；馬廄"], ["stadium", "體育場"], ["staff", "全體員工"],
+    ["stale", "不新鮮的"], ["stare", "凝視"], ["starve", "挨餓"], ["statue", "雕像"],
+    ["steady", "穩定的"], ["steep", "陡峭的"], ["stepchild", "繼子/女"], ["stepfather", "繼父"],
+    ["stepmother", "繼母"], ["stereo", "立體音響"], ["sticky", "黏的"], ["stiff", "僵硬的"],
+    ["sting", "刺；叮"], ["stir", "攪拌"], ["stitch", "一針"], ["stocking(s)", "長襪"],
+    ["stool", "凳子"], ["stormy", "暴風雨的"], ["strategy", "策略"], ["strength", "力量"],
+    ["strip", "剝去；長條"], ["structure", "結構"], ["stubborn", "固執的"], ["studio", "工作室"],
+    ["stuff", "東西；塞滿"], ["style", "風格"], ["substance", "物質"], ["suburb", "郊區"],
+    ["suck", "吸"], ["suffer", "受苦"], ["sufficient", "充足的"], ["suggest", "建議"],
+    ["suicide", "自殺"], ["suitable", "適合的"], ["sum", "總和"], ["summary", "摘要"],
+    ["summit", "頂峰；高峰會"], ["superior", "優越的"], ["suppose", "假設"], ["surround", "圍繞"],
+    ["survey", "調查"], ["survival", "生存"], ["survivor", "生還者"], ["suspect", "懷疑；嫌疑犯"],
+    ["suspicion", "懷疑"], ["swear", "發誓；咒罵"], ["sweat", "汗水"], ["swell", "腫脹"],
+    ["swift", "迅速的"], ["switch", "開關；轉換"], ["sword", "劍"], ["system", "系統"],
+    ["tablet", "藥片；平板"], ["tack", "大頭釘"], ["tag", "標籤"], ["tailor", "裁縫師"],
+    ["tame", "馴服的"], ["tap", "輕拍；水龍頭"], ["tax", "稅"], ["tease", "戲弄"],
+    ["technical", "技術的"], ["technique", "技巧"], ["technology", "科技"], ["temper", "脾氣"],
+    ["temperature", "溫度"], ["temporary", "暫時的"], ["tend", "傾向於；照顧"], ["tender", "溫柔的；嫩的"],
+    ["territory", "領土"], ["text", "正文；簡訊"], ["thankful", "感謝的"], ["theory", "理論"],
+    ["thirst", "口渴"], ["thread", "線"], ["threat", "威脅(名詞)"], ["threaten", "威脅(動詞)"],
+    ["tickle", "搔癢"], ["tide", "潮汐"], ["tidy", "整潔的"], ["tight", "緊的"],
+    ["tighten", "拉緊"], ["timber", "木材"], ["tissue", "衛生紙；組織"], ["tobacco", "菸草"],
+    ["ton", "噸"], ["tortoise", "陸龜"], ["toss", "拋"], ["tourism", "觀光業"],
+    ["tourist", "觀光客"], ["tow", "拖"], ["trace", "痕跡；追蹤"], ["trader", "商人"],
+    ["trail", "小徑；拖曳"], ["transport", "運輸"], ["trash", "垃圾"], ["traveler", "旅客"],
+    ["tray", "托盤"], ["tremble", "顫抖"], ["trend", "趨勢"], ["tribe", "部落"],
+    ["tricky", "狡猾的；棘手的"], ["troop", "軍隊"], ["tropical", "熱帶的"], ["trunk", "樹幹；後車廂"],
+    ["truthful", "誠實的"], ["tub", "浴缸"], ["tug", "用力拉"], ["tulip", "鬱金香"],
+    ["tumble", "跌倒"], ["tune", "曲調；調音"], ["tutor", "家教"], ["twig", "細枝"],
+    ["twin", "雙胞胎"], ["twist", "扭轉"], ["typewriter", "打字機"], ["typical", "典型的"],
+    ["union", "工會；聯合"], ["unite", "團結"], ["unity", "統一"], ["universe", "宇宙"],
+    ["unless", "除非"], ["upset", "心煩的"], ["vacant", "空缺的"], ["valuable", "貴重的"],
+    ["van", "廂型車"], ["vanish", "消失"], ["variety", "多樣性"], ["various", "各式各樣的"],
+    ["vary", "變化"], ["vase", "花瓶"], ["vehicle", "車輛"], ["verse", "詩句"],
+    ["vest", "背心"], ["vice-president", "副總統"], ["victim", "受害者"], ["violence", "暴力"],
+    ["violent", "暴力的"], ["violet", "紫羅蘭色"], ["visible", "可看見的"], ["vision", "視力；願景"],
+    ["vitamin", "維他命"], ["vivid", "生動的"], ["volume", "音量；體積"], ["wag", "搖(尾巴)"],
+    ["wage(s)", "工資"], ["wagon", "馬車；推車"], ["waken", "喚醒"], ["wander", "漫遊"],
+    ["warmth", "溫暖"], ["warn", "警告"], ["wax", "蠟"], ["weaken", "減弱"],
+    ["wealth", "財富"], ["wealthy", "富有的"], ["weave", "編織"], ["web", "網"],
+    ["weed", "雜草"], ["weep", "哭泣"], ["wheat", "小麥"], ["whip", "鞭打"],
+    ["whistle", "吹口哨"], ["wicked", "邪惡的"], ["willow", "柳樹"], ["wink", "眨眼"],
+    ["wipe", "擦拭"], ["wisdom", "智慧"], ["wrap", "包裝"], ["wrist", "手腕"],
+    ["X-ray", "X光"], ["yawn", "打呵欠"], ["yell", "吼叫"], ["yolk", "蛋黃"],
+    ["youngster", "年輕人"], ["zipper", "拉鍊"], ["zone", "區域"]
+   
+    ];
+
+    const dataLevel4 = [
+        ["abandon", "放棄；遺棄"], ["abdomen", "腹部"], ["absolute", "絕對的"], ["absorb", "吸收"],
+    ["abstract", "抽象的"], ["academic", "學術的"], ["accent", "腔調；重音"], ["acceptance", "接受"],
+    ["access", "接近；使用權"], ["accidental", "意外的"], ["accompany", "陪伴"], ["accomplish(ment)", "完成；成就"],
+    ["accountant", "會計師"], ["accuracy", "準確性"], ["accuse", "指控"], ["acid", "酸"],
+    ["acquaint", "使熟悉"], ["acquaintance", "相識的人"], ["acquire", "獲得"], ["acre", "英畝"],
+    ["adapt", "適應；改編"], ["adequate", "足夠的"], ["adjective", "形容詞"], ["adjust(ment)", "調整"],
+    ["admirable", "令人欽佩的"], ["admiration", "欽佩"], ["admission", "允許進入；入場費"], ["adverb", "副詞"],
+    ["agency", "代理機構"], ["agent", "代理人；特務"], ["aggressive", "侵略性的；積極的"], ["agreeable", "令人愉快的"],
+    ["AIDS", "愛滋病"], ["alcohol", "酒精"], ["alert", "警覺的"], ["allowance", "零用錢"],
+    ["aluminum", "鋁"], ["a.m./AM", "上午"], ["amateur", "業餘的"], ["ambitious", "有野心的"],
+    ["amid/amidst", "在...之中"], ["amuse(ment)", "娛樂；使快樂"], ["analysis", "分析"], ["analyze", "分析(動詞)"],
+    ["ancestor", "祖先"], ["anniversary", "週年紀念"], ["annoy", "使煩惱"], ["annual", "每年的"],
+    ["anxiety", "焦慮"], ["anxious", "焦慮的；渴望的"], ["apologize", "道歉"], ["apology", "道歉(名詞)"],
+    ["appliance", "家用電器"], ["applicant", "申請人"], ["application", "申請；應用程式"], ["appoint(ment)", "任命；約會"],
+    ["appreciation", "感激；欣賞"], ["appropriate", "適當的"], ["approval", "批准；贊成"], ["arch", "拱門"],
+    ["arise", "發生；升起"], ["arms", "武器"], ["arouse", "喚起"], ["article (1)", "文章；物品"],
+    ["artificial", "人造的"], ["artistic", "藝術的"], ["ashamed", "感到羞愧的"], ["aspect", "方面"],
+    ["aspirin", "阿斯匹靈"], ["assemble", "集合；組裝"], ["assembly", "集會"], ["assign(ment)", "指派；作業"],
+    ["assistance", "協助"], ["associate", "聯想；結交"], ["association", "協會；關聯"], ["assume", "假定；承擔"],
+    ["assurance", "保證"], ["assure", "向...保證"], ["athletic", "運動的"], ["ATM", "自動提款機"],
+    ["atmosphere", "氣氛；大氣層"], ["atom", "原子"], ["atomic", "原子的"], ["attach(ment)", "附上；附件"],
+    ["attraction", "吸引力；景點"], ["audio", "聲音的"], ["authority", "權威；當局"], ["autobiography", "自傳"],
+    ["await", "等待"], ["awkward", "笨拙的；尷尬的"], ["backpack", "背包"], ["bald", "禿頭的"],
+    ["ballet", "芭蕾舞"], ["bankrupt", "破產的"], ["bargain", "討價還價；便宜貨"], ["barrier", "障礙"],
+    ["basin", "臉盆；盆地"], ["battery", "電池"], ["beak", "鳥嘴"], ["beam (2)", "光線；微笑"],
+    ["behavior", "行為"], ["biography", "傳記"], ["biology", "生物學"], ["blade", "刀片"],
+    ["blend", "混合"], ["blessing", "祝福"], ["blink", "眨眼"], ["bloom", "開花"],
+    ["blossom", "花朵(果樹)"], ["blush", "臉紅"], ["boast", "自誇"], ["bond", "連結；債券"],
+    ["bounce", "彈跳"], ["bracelet", "手鐲"], ["brassiere/bra", "胸罩"], ["breed", "繁殖；品種"],
+    ["bridegroom/groom", "新郎"], ["broil", "燒烤"], ["broke", "破產的(口語)"], ["brutal", "殘忍的"],
+    ["bulletin", "公告"], ["cabinet", "櫥櫃；內閣"], ["calculate", "計算"], ["calculation", "計算(名詞)"],
+    ["calculator", "計算機"], ["calorie", "卡路里"], ["campaign", "活動；競選"], ["candidate", "候選人"],
+    ["capacity", "容量；能力"], ["cape", "披肩；海角"], ["capital(ism) (2)", "資本主義"], ["capitalist", "資本家"],
+    ["career", "職業生涯"], ["cargo", "貨物"], ["carrier", "運送者；帶原者"], ["carve", "雕刻"],
+    ["catalogue/catalog", "目錄"], ["CD", "光碟"], ["cease", "停止"], ["celebration", "慶祝活動"],
+    ["cement", "水泥"], ["chamber", "房間；室"], ["championship", "冠軍賽"], ["characteristic", "特徵"],
+    ["charity", "慈善"], ["chemistry", "化學"], ["cherish", "珍惜"], ["chirp", "鳥叫聲"],
+    ["chore", "雜務"], ["chorus", "合唱團"], ["cigar", "雪茄"], ["cinema", "電影院"],
+    ["circular", "圓形的"], ["circulate", "循環；流通"], ["circulation", "循環；發行量"], ["circumstance", "情況"],
+    ["civilian", "平民"], ["civilization", "文明"], ["clarify", "釐清"], ["clash", "衝突"],
+    ["classification", "分類"], ["classify", "分類(動詞)"], ["cliff", "懸崖"], ["climax", "高潮"],
+    ["clumsy", "笨拙的"], ["coarse", "粗糙的"], ["code", "密碼；法規"], ["collapse", "倒塌；崩潰"],
+    ["combination", "結合"], ["comedy", "喜劇"], ["comic (1)", "滑稽的"], ["comic(s) (2)", "漫畫"],
+    ["commander", "指揮官"], ["comment", "評論"], ["commerce", "商業"], ["commit", "犯罪；承諾"],
+    ["communication", "溝通"], ["community", "社區"], ["companion", "同伴"], ["competition", "競爭"],
+    ["competitive", "競爭的"], ["competitor", "競爭者"], ["complicate", "使複雜"], ["compose", "組成；作曲"],
+    ["composer", "作曲家"], ["composition", "作文；組成"], ["concentrate", "專心"], ["concentration", "專心；集中"],
+    ["concept", "概念"], ["concerning", "關於"], ["concrete", "具體的；混凝土"], ["conductor", "指揮；導體"],
+    ["conference", "會議"], ["confess", "承認；招供"], ["confidence", "信心"], ["confine", "限制；監禁"],
+    ["confusion", "困惑"], ["congratulate", "恭喜"], ["congress", "國會"], ["conjunction", "連接詞"],
+    ["conquer", "征服"], ["conscience", "良心"], ["consequence", "後果"], ["consequent", "隨之發生的"],
+    ["conservative", "保守的"], ["consist", "組成"], ["consistent", "一致的"], ["consonant", "子音"],
+    ["constitute", "構成"], ["constitution", "憲法"], ["construct", "建造"], ["construction", "建設"],
+    ["constructive", "建設性的"], ["consult", "請教；查閱"], ["consultant", "顧問"], ["consume", "消耗；消費"],
+    ["consumer", "消費者"], ["container", "容器"], ["content (1)", "內容"], ["content(ment) (2)", "滿足"],
+    ["content(s) (3)", "目錄；內容物"], ["contest", "比賽"], ["context", "上下文；背景"], ["continual", "頻頻的"],
+    ["continuous", "連續的"], ["contrary", "相反的"], ["contrast", "對比"], ["contribute", "貢獻"],
+    ["contribution", "貢獻(名詞)"], ["convenience", "方便"], ["convention", "慣例；大會"], ["conventional", "傳統的"],
+    ["converse", "交談"], ["convey", "傳達"], ["convince", "說服"], ["cooperate", "合作"],
+    ["cooperation", "合作(名詞)"], ["cooperative", "合作的"], ["cope", "應付"], ["copper", "銅"],
+    ["cord", "細繩；電線"], ["cork", "軟木塞"], ["correspond", "符合；通信"], ["costume", "服裝"],
+    ["cottage", "小屋"], ["council", "議會"], ["counter (1) (2)", "櫃檯；計數器"], ["courageous", "勇敢的"],
+    ["courteous", "有禮貌的"], ["courtesy", "禮貌"], ["crack", "裂縫"], ["craft", "工藝"],
+    ["cram", "死記硬背；塞滿"], ["creation", "創造"], ["creativity", "創造力"], ["cripple", "跛子；使殘廢"],
+    ["critic", "評論家"], ["critical", "批評的；關鍵的"], ["criticism", "批評"], ["criticize", "批評(動詞)"],
+    ["cruelty", "殘忍"], ["crush", "壓碎；迷戀"], ["cube", "立方體"], ["cucumber", "小黃瓜"],
+    ["cue", "暗示"], ["cunning", "狡猾的"], ["curiosity", "好奇心"], ["curl", "捲曲"],
+    ["curse", "詛咒"], ["curve", "曲線"], ["cushion", "墊子"], ["damn", "該死"],
+    ["damp", "潮濕的"], ["deadline", "截止日期"], ["declare", "宣布"], ["decoration", "裝飾"],
+    ["decrease", "減少"], ["defeat", "擊敗"], ["defend", "防禦"], ["defense", "防禦(名詞)"],
+    ["defensible", "可防禦的"], ["defensive", "防禦性的"], ["definite", "明確的"], ["delicate", "精緻的；脆弱的"],
+    ["delight", "愉快"], ["delightful", "令人愉快的"], ["demand", "要求"], ["demonstrate", "示範；示威"],
+    ["demonstration", "示範；示威活動"], ["dense", "稠密的"], ["depart", "出發"], ["departure", "出發(名詞)"],
+    ["dependable", "可靠的"], ["dependent", "依賴的"], ["depress", "使沮喪"], ["depression", "沮喪；蕭條"],
+    ["deserve", "值得"], ["desperate", "絕望的；拼命的"], ["despite", "儘管"], ["destruction", "破壞"],
+    ["detective", "偵探"], ["determination", "決心"], ["device", "裝置"], ["devise", "設計；發明"],
+    ["devote", "奉獻"], ["diaper", "尿布"], ["differ", "不同"], ["digest (1) (2)", "消化；摘要"],
+    ["digestion", "消化(名詞)"], ["digital", "數位的"], ["dignity", "尊嚴"], ["diligence", "勤勉"],
+    ["diploma", "文憑"], ["diplomat", "外交官"], ["disadvantage", "缺點"], ["disaster", "災難"],
+    ["discipline", "紀律"], ["disconnect", "切斷連接"], ["discourage(ment)", "使氣餒"], ["disguise", "偽裝"],
+    ["disgust", "噁心；厭惡"], ["dismiss", "解散；駁回"], ["disorder", "混亂；失調"], ["dispute", "爭論"],
+    ["distinct", "明顯的；獨特的"], ["distinguish", "區別"], ["distinguished", "傑出的"], ["distribute", "分發"],
+    ["distribution", "分發；分佈"], ["district", "區域"], ["disturb", "打擾"], ["divine", "神聖的"],
+    ["divorce", "離婚"], ["dominant", "佔優勢的"], ["dominate", "支配"], ["dormitory/dorm", "宿舍"],
+    ["download", "下載"], ["doze", "打瞌睡"], ["draft", "草稿"], ["dread", "恐懼"],
+    ["drift", "漂流"], ["drill", "鑽孔；演習"], ["durable", "耐用的"], ["dusty", "滿是灰塵的"],
+    ["DVD", "數位影音光碟"], ["dye", "染色"], ["dynamic", "充滿活力的"], ["dynasty", "朝代"],
+    ["earnest", "認真的"], ["earphone", "耳機"], ["economic", "經濟的"], ["economical", "節儉的"],
+    ["economics", "經濟學"], ["economist", "經濟學家"], ["economy", "經濟"], ["efficiency", "效率"],
+    ["elastic", "有彈性的"], ["electrician", "電工"], ["electronics", "電子學"], ["elegant", "優雅的"],
+    ["elementary", "基本的"], ["eliminate", "消除"], ["elsewhere", "在別處"], ["e-mail", "電子郵件"],
+    ["embarrass(ment)", "使尷尬"], ["embassy", "大使館"], ["emerge", "浮現"], ["emotional", "情緒的"],
+    ["emphasis", "強調"], ["empire", "帝國"], ["enclose", "隨信附上；圍住"], ["encounter", "遭遇"],
+    ["endanger", "危及"], ["endure", "忍受"], ["enforce(ment)", "執行"], ["engineering", "工程"],
+    ["enlarge(ment)", "擴大"], ["enormous", "巨大的"], ["entertain(ment)", "娛樂"], ["enthusiasm", "熱忱"],
+    ["envious", "嫉妒的"], ["equality", "平等"], ["equip(ment)", "裝備"], ["era", "時代"],
+    ["errand", "差事"], ["escalator", "手扶梯"], ["essay", "論文；散文"], ["essential", "必要的"],
+    ["establish(ment)", "建立"], ["estimate", "估計"], ["evaluate", "評估"], ["evaluation", "評估(名詞)"],
+    ["eve", "前夕"], ["eventual", "最後的"], ["evidence", "證據"], ["evident", "明顯的"],
+    ["exaggerate", "誇大"], ["examinee", "應試者"], ["examiner", "主考官"], ["exception", "例外"],
+    ["exhaust (1) (2)", "耗盡；廢氣"], ["exhibit", "展覽"], ["expand", "擴大"], ["expansion", "擴張"],
+    ["experimental", "實驗性的"], ["explanation", "解釋"], ["explore", "探索"], ["explosion", "爆炸"],
+    ["explosive", "爆炸性的"], ["expose", "暴露"], ["exposure", "暴露(名詞)"], ["extend", "延伸"],
+    ["extent", "程度"], ["facial", "臉部的"], ["facility", "設施"], ["faithful", "忠實的"],
+    ["fame", "名聲"], ["fantastic", "極好的；幻想的"], ["fantasy", "幻想"], ["farewell", "告別"],
+    ["fatal", "致命的"], ["favorable", "有利的；贊成的"], ["feast", "盛宴"], ["ferry", "渡輪"],
+    ["fertile", "肥沃的"], ["fetch", "拿來"], ["fiction", "小說"], ["fierce", "兇猛的"],
+    ["finance", "財政"], ["financial", "財務的"], ["firecracker", "鞭炮"], ["fireplace", "壁爐"],
+    ["flatter", "阿諛奉承"], ["flee", "逃跑"], ["flexible", "有彈性的"], ["fluent", "流利的"],
+    ["flunk", "不及格"], ["flush", "沖水；臉紅"], ["foam", "泡沫"], ["forbid", "禁止"],
+    ["forecast", "預報"], ["formation", "形成"], ["formula", "公式；配方"], ["fort", "堡壘"],
+    ["fortunate", "幸運的"], ["fossil", "化石"], ["foundation", "基礎；基金會"], ["founder", "創辦人"],
+    ["fragrance", "香味"], ["fragrant", "芳香的"], ["frame", "框架"], ["freeway", "高速公路"],
+    ["frequency", "頻率"], ["freshman", "大一新生"], ["frost", "霜"], ["frown", "皺眉"],
+    ["frustration", "挫折"], ["fuel", "燃料"], ["fulfill(ment)", "實現"], ["functional", "功能性的"],
+    ["fundamental", "基礎的"], ["funeral", "葬禮"], ["furious", "憤怒的"], ["furnish", "佈置傢俱"],
+    ["furthermore", "此外"], ["gallery", "畫廊"], ["gangster", "歹徒"], ["gaze", "凝視"],
+    ["gear", "齒輪；裝備"], ["gene", "基因"], ["generation", "世代"], ["generosity", "慷慨"],
+    ["genius", "天才"], ["genuine", "真正的"], ["germ", "細菌"], ["gifted", "有天賦的"],
+    ["gigantic", "巨大的"], ["giggle", "咯咯笑"], ["ginger", "薑"], ["glide", "滑翔"],
+    ["glimpse", "瞥見"], ["globe", "地球；球體"], ["glorious", "光榮的"], ["goods", "商品"],
+    ["grace", "優雅"], ["graceful", "優雅的"], ["gracious", "親切的"], ["graduation", "畢業"],
+    ["grammar", "文法"], ["grammatical", "文法的"], ["grapefruit", "葡萄柚"], ["grateful", "感激的"],
+    ["gratitude", "感激"], ["grave (1) (2)", "墳墓；嚴重的"], ["greasy", "油膩的"], ["greeting(s)", "問候"],
+    ["grief", "悲傷"], ["grieve", "悲傷(動詞)"], ["grind", "研磨"], ["guarantee", "保證"],
+    ["guilt", "罪惡感"], ["guilty", "有罪的"], ["gulf", "海灣"], ["habitual", "習慣性的"],
+    ["halt", "停止"], ["handwriting", "筆跡"], ["harden", "變硬"], ["hardship", "艱難"],
+    ["hardware", "硬體"], ["harmonica", "口琴"], ["harmony", "和諧"], ["harsh", "嚴厲的"],
+    ["haste", "匆忙"], ["hasten", "催促"], ["hatred", "憎恨"], ["headphone(s)", "耳機"],
+    ["healthful", "有益健康的"], ["helicopter", "直升機"], ["herd", "獸群"], ["hesitation", "猶豫"],
+    ["highly", "高度地"], ["homeland", "祖國"], ["honeymoon", "蜜月"], ["honorable", "值得尊敬的"],
+    ["hook", "掛鉤"], ["hopeful", "抱有希望的"], ["horizon", "地平線"], ["horrify", "使恐懼"],
+    ["hose", "水管"], ["host (2)", "主持；主辦"], ["hostel", "青年旅館"], ["household", "家庭"],
+    ["housewife", "家庭主婦"], ["housework", "家事"], ["humanity", "人性；人類"], ["humidity", "濕度"],
+    ["hurricane", "颶風"], ["hydrogen", "氫"], ["iceberg", "冰山"], ["identical", "完全相同的"],
+    ["identification/ID", "身分證明"], ["identify", "識別"], ["idiom", "成語；慣用語"], ["idle", "閒置的"],
+    ["idol", "偶像"], ["ignorant", "無知的"], ["illustrate", "說明；插圖"], ["illustration", "插圖"],
+    ["imaginable", "可想像的"], ["imaginary", "想像中的"], ["imaginative", "富有想像力的"], ["imitate", "模仿"],
+    ["imitation", "模仿(名詞)"], ["immigrant", "移民"], ["immigrate", "移入"], ["immigration", "移居"],
+    ["impact", "衝擊；影響"], ["imply", "暗示"], ["impression", "印象"], ["incident", "事件"],
+    ["including", "包括"], ["indication", "指示"], ["industrialize", "工業化"], ["infant", "嬰兒"],
+    ["infect", "感染"], ["infection", "感染(名詞)"], ["inflation", "通貨膨脹"], ["influential", "有影響力的"],
+    ["information", "資訊"], ["informative", "增廣見聞的"], ["ingredient", "成分"], ["initial (1) (2)", "最初的；縮寫"],
+    ["innocence", "無辜；天真"], ["input", "輸入"], ["insert", "插入"], ["inspection", "檢查"],
+    ["inspiration", "靈感"], ["inspire", "鼓舞"], ["install", "安裝"], ["instinct", "本能"],
+    ["instruct", "指示；教導"], ["instructor", "講師"], ["insult", "侮辱"], ["insurance", "保險"],
+    ["intellectual", "智力的"], ["intelligence", "智能；情報"], ["intelligent", "聰明的"], ["intend", "打算"],
+    ["intense", "強烈的"], ["intensify", "加強"], ["intensity", "強度"], ["intensive", "密集的"],
+    ["intention", "意圖"], ["interact", "互動"], ["interaction", "互動(名詞)"], ["interfere", "干涉"],
+    ["intermediate", "中級的"], ["Internet", "網際網路"], ["interpret", "解釋；翻譯"], ["interruption", "打斷"],
+    ["intimate", "親密的"], ["intonation", "語調"], ["invade", "侵略"], ["invasion", "侵略(名詞)"],
+    ["invention", "發明"], ["invest(ment)", "投資"], ["investigation", "調查"], ["involve(ment)", "牽涉"],
+    ["isolate", "孤立"], ["isolation", "孤立(名詞)"], ["itch", "癢"], ["jealousy", "嫉妒"],
+    ["junior", "年少的；大三生"], ["keen", "敏銳的；熱衷的"], ["knuckle", "指關節"], ["labor", "勞動"],
+    ["laboratory/lab", "實驗室"], ["lag", "落後"], ["landmark", "地標"], ["landscape", "風景"],
+    ["landslide", "山崩"], ["largely", "大部分"], ["lately", "最近"], ["launch", "發射；發起"],
+    ["lawful", "合法的"], ["lead (2)", "鉛"], ["lean (1) (2)", "傾斜；瘦的"], ["learned", "博學的"],
+    ["learning", "學習"], ["lecture", "演講"], ["lecturer", "講師"], ["legend", "傳說"],
+    ["leisurely", "悠閒的"], ["license", "執照"], ["lighten", "照亮；減輕"], ["limitation", "限制"],
+    ["liquor", "烈酒"], ["literary", "文學的"], ["literature", "文學"], ["loan", "貸款"],
+    ["location", "地點"], ["locker", "置物櫃"], ["logic", "邏輯"], ["logical", "合乎邏輯的"],
+    ["lotion", "乳液"], ["lousy", "糟糕的"], ["loyal", "忠誠的"], ["loyalty", "忠誠"],
+    ["lunar", "陰曆的"], ["luxurious", "奢華的"], ["luxury", "奢侈品"], ["machinery", "機械"],
+    ["madam/ma'am", "女士"], ["magnetic", "有磁性的"], ["magnificent", "壯麗的"], ["makeup (1) (2)", "化妝；構成"],
+    ["manual", "手冊；手動的"], ["manufacture", "製造"], ["manufacturer", "製造商"], ["marathon", "馬拉松"],
+    ["margin", "邊緣；利潤"], ["maturity", "成熟"], ["maximum", "最大值"], ["measure(s) (2)", "措施"],
+    ["mechanic", "技工"], ["mechanical", "機械的"], ["memorable", "難忘的"], ["memorial", "紀念碑"],
+    ["mercy", "慈悲"], ["mere", "僅僅"], ["merit", "優點"], ["messenger", "信差"],
+    ["messy", "雜亂的"], ["microscope", "顯微鏡"], ["mild", "溫和的"], ["mineral", "礦物"],
+    ["minimum", "最小值"], ["minister", "部長；牧師"], ["ministry", "部"], ["mischief", "惡作劇"],
+    ["miserable", "悲慘的"], ["misfortune", "不幸"], ["mislead", "誤導"], ["misunderstand", "誤解"],
+    ["moderate", "適度的"], ["modest", "謙虛的"], ["modesty", "謙虛"], ["monitor", "監視器；班長"],
+    ["monthly", "每月的"], ["monument", "紀念碑"], ["moreover", "此外"], ["mostly", "主要地"],
+    ["motivate", "激勵"], ["motivation", "動機"], ["mountainous", "多山的"], ["mow", "割草"],
+    ["MTV", "音樂電視"], ["muddy", "泥濘的"], ["multiple", "多樣的"], ["murderer", "兇手"],
+    ["murmur", "低語"], ["mustache", "鬍子"], ["mutual", "互相的"], ["mysterious", "神秘的"],
+    ["namely", "也就是"], ["nationality", "國籍"], ["nearsighted", "近視的"], ["needy", "貧窮的"],
+    ["neglect", "忽視"], ["negotiate", "談判"], ["nevertheless", "儘管如此"], ["nightmare", "惡夢"],
+    ["nonsense", "胡說"], ["noun", "名詞"], ["nowadays", "現今"], ["nuclear", "核能的"],
+    ["numerous", "許多的"], ["nursery", "托兒所"], ["nylon", "尼龍"], ["obedience", "服從"],
+    ["obedient", "服從的"], ["objection", "反對"], ["objective (1) (2)", "客觀的；目標"], ["observation", "觀察"],
+    ["obstacle", "障礙"], ["obtain", "獲得"], ["occasional", "偶爾的"], ["occupation", "職業"],
+    ["occupy", "佔據"], ["offend", "冒犯"], ["offense", "進攻；冒犯"], ["offensive", "冒犯的"],
+    ["opera", "歌劇"], ["operation", "操作；手術"], ["oppose", "反對"], ["oral", "口頭的"],
+    ["orbit", "軌道"], ["orchestra", "管弦樂團"], ["organic", "有機的"], ["otherwise", "否則"],
+    ["outcome", "結果"], ["outstanding", "傑出的"], ["oval", "橢圓形"], ["overcome", "克服"],
+    ["overlook", "俯瞰；忽略"], ["overnight", "整夜"], ["overtake", "追上"], ["overthrow", "推翻"],
+    ["oxygen", "氧氣"], ["pace", "步調"], ["panel", "鑲板；座談小組"], ["parachute", "降落傘"],
+    ["paragraph", "段落"], ["partial", "局部的"], ["participation", "參與"], ["participle", "分詞"],
+    ["partnership", "合夥關係"], ["passive", "被動的"], ["pasta", "義大利麵食"], ["pebble", "鵝卵石"],
+    ["peculiar", "奇怪的"], ["pedal", "踏板"], ["peer (1) (2)", "同儕；凝視"], ["penalty", "懲罰"],
+    ["percent", "百分比"], ["percentage", "百分率"], ["perfection", "完美"], ["perfume", "香水"],
+    ["permanent", "永久的"], ["persuasion", "說服"], ["persuasive", "有說服力的"], ["pessimistic", "悲觀的"],
+    ["petal", "花瓣"], ["phenomenon", "現象"], ["philosopher", "哲學家"], ["philosophical", "哲學的"],
+    ["philosophy", "哲學"], ["photography", "攝影"], ["physical", "身體的；物理的"], ["physician", "內科醫生"],
+    ["physicist", "物理學家"], ["physics", "物理學"], ["pianist", "鋼琴家"], ["pickpocket", "扒手"],
+    ["pioneer", "拓荒者"], ["pirate", "海盜"], ["plentiful", "豐富的"], ["plot", "情節；陰謀"],
+    ["plural", "複數"], ["p.m./PM", "下午"], ["poisonous", "有毒的"], ["polish", "擦亮"],
+    ["pollution", "污染"], ["popularity", "流行；聲望"], ["portable", "可攜帶的"], ["porter", "搬運工"],
+    ["portray", "描繪"], ["possess", "擁有"], ["possession", "財產"], ["precise", "精確的"],
+    ["predict", "預測"], ["preferable", "更好的"], ["pregnancy", "懷孕"], ["pregnant", "懷孕的"],
+    ["preposition", "介系詞"], ["presentation", "報告；呈現"], ["preservation", "保存"], ["preserve", "保存(動詞)"],
+    ["prevention", "預防"], ["prime", "主要的；最好的"], ["primitive", "原始的"], ["privacy", "隱私"],
+    ["privilege", "特權"], ["procedure", "程序"], ["proceed", "繼續進行"], ["production", "生產"],
+    ["productive", "多產的"], ["profession", "職業"], ["professional", "專業的"], ["professor", "教授"],
+    ["profitable", "有利潤的"], ["prominent", "傑出的"], ["promising", "有前途的"], ["promotion", "升遷；促銷"],
+    ["prompt (1) (2)", "迅速的；促使"], ["pronoun", "代名詞"], ["pronunciation", "發音"], ["prosper", "繁榮"],
+    ["prosperity", "繁榮(名詞)"], ["prosperous", "繁榮的"], ["protein", "蛋白質"], ["protest", "抗議"],
+    ["proverb", "諺語"], ["psychological", "心理的"], ["psychologist", "心理學家"], ["psychology", "心理學"],
+    ["publication", "出版"], ["publicity", "宣傳"], ["publish", "出版(動詞)"], ["publisher", "出版社"],
+    ["pursuit", "追求"], ["quake", "震動"], ["quilt", "棉被"], ["quotation", "引語；報價"],
+    ["rage", "盛怒"], ["rainfall", "降雨量"], ["realistic", "現實的"], ["rebel (1) (2)", "造反者；反抗"],
+    ["recall", "回想"], ["reception", "接待"], ["recipe", "食譜"], ["recite", "背誦"],
+    ["recognition", "認出；認可"], ["recovery", "恢復"], ["recreation", "娛樂"], ["recycle", "回收"],
+    ["reduction", "減少"], ["refer", "參考；提及"], ["reference", "參考"], ["reflect", "反射；反省"],
+    ["reflection", "反射；倒影"], ["reform", "改革"], ["refresh", "使精神煥發"], ["refugee", "難民"],
+    ["refusal", "拒絕"], ["regarding", "關於"], ["register", "註冊"], ["registration", "登記"],
+    ["regulate", "管理；調節"], ["regulation", "規定"], ["rejection", "拒絕"], ["relative (1) (2)", "親戚；相對的"],
+    ["relaxation", "放鬆"], ["relieve", "減輕"], ["reluctant", "不情願的"], ["remark", "評論"],
+    ["remarkable", "非凡的"], ["remedy", "療法"], ["repetition", "重複"], ["representation", "代表"],
+    ["reputation", "名聲"], ["rescue", "救援"], ["research", "研究"], ["researcher", "研究人員"],
+    ["resemble", "像"], ["reservation", "預約"], ["resign", "辭職"], ["resignation", "辭職(名詞)"],
+    ["resistance", "抵抗"], ["resolution", "決心"], ["resolve", "解決；下決心"], ["respectable", "值得尊敬的"],
+    ["respectful", "恭敬的"], ["restore", "恢復"], ["restriction", "限制"], ["retain", "保留"],
+    ["retire(ment)", "退休"], ["retreat", "撤退"], ["reunion", "團聚"], ["revenge", "報復"],
+    ["revise", "修訂"], ["revision", "修訂本"], ["revolution", "革命"], ["revolutionary", "革命性的"],
+    ["reward", "報酬"], ["rhyme", "押韻"], ["rhythm", "節奏"], ["romance", "羅曼史"],
+    ["roughly", "粗略地"], ["route", "路線"], ["ruin", "毀壞"], ["rural", "鄉村的"],
+    ["sacrifice", "犧牲"], ["salary", "薪水"], ["salesperson", "銷售員"], ["satellite", "衛星"],
+    ["satisfaction", "滿意"], ["scarcely", "幾乎不"], ["scenery", "風景"], ["scold", "責罵"],
+    ["scratch", "抓；刮"], ["screwdriver", "螺絲起子"], ["sculpture", "雕塑"], ["seagull", "海鷗"],
+    ["senior", "年長的；大四生"], ["settler", "移民"], ["severe", "嚴重的"], ["shameful", "可恥的"],
+    ["shaver", "刮鬍刀"], ["shelter", "避難所"], ["shift", "轉移；輪班"], ["shortsighted", "近視的"],
+    ["shrug", "聳肩"], ["shuttle", "接駁車"], ["sightseeing", "觀光"], ["signature", "簽名"],
+    ["significance", "重要性"], ["sincerity", "真誠"], ["singular", "單數的"], ["site", "地點"],
+    ["sketch", "素描"], ["sledge/sled", "雪橇"], ["sleigh", "雪橇(馬拉的)"], ["slight", "輕微的"],
+    ["slogan", "口號"], ["smog", "煙霧"], ["sneeze", "打噴嚏"], ["sob", "啜泣"],
+    ["socket", "插座"], ["software", "軟體"], ["solar", "太陽的"], ["sophomore", "大二生"],
+    ["sorrowful", "悲傷的"], ["souvenir", "紀念品"], ["spare", "多餘的；撥出"], ["spark", "火花"],
+    ["sparkle", "閃耀"], ["sparrow", "麻雀"], ["spear", "矛"], ["species", "物種"],
+    ["spicy", "辛辣的"], ["spiritual", "精神上的"], ["splendid", "燦爛的"], ["split", "分裂"],
+    ["sportsman", "運動員"], ["sportsmanship", "運動家精神"], ["status", "地位"], ["stem", "莖"],
+    ["stingy", "吝嗇的"], ["strengthen", "加強"], ["strive", "奮鬥"], ["stroke (1) (2)", "中風；撫摸"],
+    ["submarine", "潛水艇"], ["suggestion", "建議"], ["summarize", "總結"], ["surf", "衝浪"],
+    ["surgeon", "外科醫生"], ["surgery", "手術"], ["surrender", "投降"], ["surroundings", "環境"],
+    ["suspicious", "可疑的"], ["sway", "搖擺"], ["syllable", "音節"], ["sympathetic", "有同情心的"],
+    ["sympathy", "同情"], ["symphony", "交響樂"], ["syrup", "糖漿"], ["systematic", "有系統的"],
+    ["tap (2)", "竊聽；開發"], ["technician", "技術人員"], ["technological", "科技的"], ["telegram", "電報"],
+    ["telegraph", "電報(機)"], ["telescope", "望遠鏡"], ["tendency", "傾向"], ["tense", "緊張的"],
+    ["tension", "緊張"], ["terrify", "使驚嚇"], ["terror", "恐怖"], ["theme", "主題"],
+    ["thorough", "徹底的"], ["thoughtful", "體貼的"], ["timid", "膽小的"], ["tiresome", "令人厭煩的"],
+    ["tolerable", "可忍受的"], ["tolerance", "寬容"], ["tolerate", "容忍"], ["tolerant", "寬容的"],
+    ["tomb", "墳墓"], ["tough", "堅韌的；困難的"], ["tragedy", "悲劇"], ["tragic", "悲劇的"],
+    ["transfer", "轉移"], ["transform", "改變"], ["translate", "翻譯"], ["translation", "翻譯(名詞)"],
+    ["translator", "翻譯者"], ["transportation", "交通工具"], ["tremendous", "巨大的"], ["tribal", "部落的"],
+    ["triumph", "勝利"], ["troublesome", "麻煩的"], ["tug-of-war", "拔河"], ["twinkle", "閃爍"],
+    ["typist", "打字員"], ["underpass", "地下道"], ["unique", "獨特的"], ["universal", "宇宙的；普遍的"],
+    ["university", "大學"], ["upload", "上傳"], ["urban", "都市的"], ["urge", "催促"],
+    ["urgent", "緊急的"], ["usage", "用法"], ["vain", "徒勞的；虛榮的"], ["vast", "廣大的"],
+    ["vegetarian", "素食者"], ["verb", "動詞"], ["very (2)", "恰好是"], ["vessel", "船艦；血管"],
+    ["vinegar", "醋"], ["violate", "違反"], ["violation", "違反(名詞)"], ["virgin", "處女"],
+    ["virtue", "美德"], ["virus", "病毒"], ["visual", "視覺的"], ["vital", "維持生命必須的"],
+    ["volcano", "火山"], ["voluntary", "自願的"], ["volunteer", "志工"], ["vowel", "母音"],
+    ["voyage", "航海"], ["walnut", "核桃"], ["website", "網站"], ["weekly", "每週的"],
+    ["welfare", "福利"], ["wit", "機智"], ["witch/wizard", "女巫/巫師"], ["withdraw", "提款；撤退"],
+    ["witness", "目擊者"], ["wreck", "殘骸；破壞"], ["wrinkle", "皺紋"], ["yearly", "每年的"],
+    ["yogurt", "優格"], ["youthful", "年輕的"]
+  
+    ];
+
+    const dataLevel5 = [
+        ["abide", "遵守；容忍"], ["abolish", "廢除"], ["abortion", "墮胎"], ["abrupt", "突然的"],
+    ["absurd", "荒謬的"], ["abundant", "豐富的"], ["academy", "學院"], ["accustom", "使習慣"],
+    ["ace", "王牌；高手"], ["acknowledge(ment)", "承認；感謝"], ["acne", "粉刺；青春痘"], ["admiral", "海軍上將"],
+    ["adolescence", "青春期"], ["adolescent", "青少年"], ["adore", "愛慕；崇拜"], ["adulthood", "成年期"],
+    ["advertiser", "廣告商"], ["affection", "情感；愛慕"], ["agenda", "議程"], ["agony", "極度痛苦"],
+    ["agricultural", "農業的"], ["AI", "人工智慧"], ["airtight", "密封的"], ["airway", "呼吸道；航線"],
+    ["aisle", "走道"], ["algebra", "代數"], ["alien", "外星人；外國的"], ["allergic", "過敏的"],
+    ["allergy", "過敏"], ["alligator", "短吻鱷"], ["ally", "盟友"], ["alter", "改變"],
+    ["alternate", "交替的"], ["altitude", "高度；海拔"], ["ample", "充足的"], ["anchor", "錨；主播"],
+    ["anthem", "聖歌；國歌"], ["antique", "古董"], ["applaud", "鼓掌"], ["applause", "掌聲"],
+    ["apt", "易於...的；恰當的"], ["architect", "建築師"], ["architecture", "建築風格"], ["arena", "競技場"],
+    ["armor", "盔甲"], ["ascend", "上升"], ["ass", "驢；傻瓜"], ["assault", "攻擊"],
+    ["asset", "資產"], ["astonish(ment)", "使驚訝"], ["astray", "迷路地"], ["astronaut", "太空人"],
+    ["astronomer", "天文學家"], ["astronomy", "天文學"], ["attendance", "出席"], ["auditorium", "禮堂"],
+    ["auxiliary", "輔助的"], ["awe", "敬畏"], ["awhile", "片刻"], ["bachelor", "單身漢；學士"],
+    ["backbone", "脊椎；骨氣"], ["badge", "徽章"], ["ballot", "選票"], ["ban", "禁止"],
+    ["bandit", "強盜"], ["banner", "旗幟"], ["banquet", "宴會"], ["barbarian", "野蠻人"],
+    ["barbershop", "理髮廳"], ["barefoot", "赤腳的"], ["barren", "貧瘠的"], ["bass", "低音；鱸魚"],
+    ["batch", "一批"], ["batter", "打擊者；麵糊"], ["bazaar", "市集"], ["beautify", "美化"],
+    ["beforehand", "事先"], ["behalf", "代表"], ["belongings", "財產"], ["beloved", "摯愛的"],
+    ["beneficial", "有益的"], ["beware", "當心"], ["bid", "出價；投標"], ["blacksmith", "鐵匠"],
+    ["blast", "爆炸；一陣強風"], ["blaze", "火焰"], ["bleach", "漂白"], ["blizzard", "暴風雪"],
+    ["blond/blonde", "金髮的"], ["blot/stain", "污漬"], ["blues", "藍調；憂鬱"], ["blur", "模糊"],
+    ["bodily", "身體的"], ["bodyguard", "保鏢"], ["bog", "沼澤"], ["bolt", "螺栓；閃電"],
+    ["bonus", "獎金"], ["boom", "繁榮；隆隆聲"], ["booth", "攤位"], ["boredom", "無聊"],
+    ["bosom", "胸懷"], ["botany", "植物學"], ["boulevard", "大道"], ["bound", "受限的；前往...的"],
+    ["boundary", "邊界"], ["bowel", "腸"], ["boxer", "拳擊手"], ["boxing", "拳擊"],
+    ["boyhood", "少年時期"], ["brace", "支撐；牙套"], ["braid", "辮子"], ["breadth", "寬度"],
+    ["bribe", "賄賂"], ["briefcase", "公事包"], ["broaden", "拓寬"], ["bronze", "青銅"],
+    ["brooch", "胸針"], ["brood", "沈思；一窩"], ["broth", "肉湯"], ["brotherhood", "兄弟情誼"],
+    ["browse", "瀏覽"], ["bruise", "瘀青"], ["bulge", "凸起"], ["bulk", "體積；大量"],
+    ["bully", "霸凌"], ["bureau", "局；處"], ["butcher", "屠夫"], ["cactus", "仙人掌"],
+    ["calf (1) (2)", "小牛；小腿"], ["calligraphy", "書法"], ["canal", "運河"], ["cannon", "大砲"],
+    ["carbon", "碳"], ["cardboard", "硬紙板"], ["carefree", "無憂無慮的"], ["caretaker", "管理員；看護"],
+    ["carnation", "康乃馨"], ["carnival", "嘉年華"], ["carp", "鯉魚"], ["carton", "紙盒"],
+    ["category", "種類"], ["cathedral", "大教堂"], ["caution", "謹慎"], ["cautious", "謹慎的"],
+    ["celebrity", "名人"], ["celery", "芹菜"], ["cellar", "地窖"], ["cell-phone", "手機"],
+    ["cello", "大提琴"], ["Celsius", "攝氏"], ["ceremony", "典禮"], ["certificate", "證書"],
+    ["chairperson", "主席"], ["chant", "吟唱"], ["chatter", "喋喋不休"], ["checkbook", "支票簿"],
+    ["check-in", "報到；住房登記"], ["check-out", "結帳離開"], ["checkup", "健康檢查"], ["chef", "主廚"],
+    ["chemist", "化學家；藥劑師"], ["chestnut", "栗子"], ["chili", "辣椒"], ["chimpanzee", "黑猩猩"],
+    ["choir", "唱詩班"], ["chord", "和弦"], ["chubby", "圓胖的"], ["circuit", "電路；巡迴"],
+    ["cite", "引用"], ["civic", "公民的"], ["clam", "蛤蜊"], ["clan", "宗族"],
+    ["clasp", "扣住；緊握"], ["clause", "條款；子句"], ["cling", "黏著；緊抓"], ["clockwise", "順時針的"],
+    ["clover", "幸運草"], ["cluster", "串；群"], ["clutch", "抓緊；離合器"], ["coastline", "海岸線"],
+    ["cocoon", "繭"], ["coil", "線圈；捲"], ["colleague", "同事"], ["colonel", "上校"],
+    ["colonial", "殖民的"], ["combat", "戰鬥"], ["comedian", "喜劇演員"], ["comet", "彗星"],
+    ["commentator", "評論員"], ["commission", "佣金；委員會"], ["commodity", "商品"], ["commonplace", "平凡的"],
+    ["communism", "共產主義"], ["communist", "共產主義者"], ["commute", "通勤"], ["commuter", "通勤者"],
+    ["compact", "緊密的；小型的"], ["compass", "指南針"], ["compassion", "同情"], ["compassionate", "有同情心的"],
+    ["compel", "強迫"], ["compliment", "讚美"], ["compound", "混合物"], ["comprehend", "理解"],
+    ["comprehension", "理解力"], ["compromise", "妥協"], ["compute", "計算"], ["computerize", "電腦化"],
+    ["comrade", "同志；夥伴"], ["conceal", "隱藏"], ["conceive", "構思；懷孕"], ["condemn", "譴責"],
+    ["conduct", "行為；指揮"], ["confession", "懺悔；招供"], ["confront", "面臨；對抗"], ["consent", "同意"],
+    ["conserve", "保存；節省"], ["considerate", "體貼的"], ["console", "安慰；控制台"], ["constitutional", "憲法的"],
+    ["contagious", "傳染性的"], ["contaminate", "污染"], ["contemplate", "沈思"], ["contemporary", "當代的"],
+    ["contempt", "輕視"], ["contend", "競爭；主張"], ["continental", "大陸的"], ["continuity", "連續性"],
+    ["convert", "轉變；皈依"], ["convict", "罪犯；宣判有罪"], ["coral", "珊瑚"], ["corporation", "大公司"],
+    ["copyright", "版權"], ["correspondence", "通信；一致"], ["corridor", "走廊"], ["corrupt", "腐敗的"],
+    ["counsel", "建議；法律顧問"], ["counselor", "顧問"], ["cozy", "舒適的"], ["counterclockwise", "逆時針的"],
+    ["coupon", "折價券"], ["courtyard", "庭院"], ["cowardly", "膽小的"], ["cracker", "薄脆餅乾"],
+    ["crater", "火山口"], ["creak", "嘎吱聲"], ["creek", "小溪"], ["crib", "嬰兒床"],
+    ["crocodile", "鱷魚"], ["crossing", "交叉口；橫渡"], ["crouch", "蹲下"], ["crunch", "咬碎聲"],
+    ["crystal", "水晶"], ["cuisine", "烹飪；菜餚"], ["curb", "路緣；抑制"], ["currency", "貨幣"],
+    ["curriculum", "課程"], ["curry", "咖哩"], ["customs", "海關"], ["dart", "飛鏢；飛奔"],
+    ["dazzle", "使目眩"], ["decay", "腐爛"], ["deceive", "欺騙"], ["declaration", "宣言"],
+    ["delegate", "代表"], ["delegation", "代表團"], ["democrat", "民主主義者"], ["denial", "否認"],
+    ["descriptive", "描述的"], ["despair", "絕望"], ["despise", "鄙視"], ["destination", "目的地"],
+    ["destiny", "命運"], ["destructive", "破壞性的"], ["devotion", "奉獻"], ["devour", "吞食"],
+    ["dialect", "方言"], ["disbelief", "不信"], ["discard", "丟棄"], ["disciple", "信徒"],
+    ["discriminate", "歧視；區別"], ["dispense", "分配；免除"], ["dispose", "處理；配置"], ["distinction", "區別；卓越"],
+    ["distinctive", "獨特的"], ["distress", "痛苦；危難"], ["document", "文件"], ["doorstep", "門階"],
+    ["doorway", "門口"], ["dormitory", "宿舍"], ["dough", "麵團"], ["downward", "向下的"],
+    ["drape", "垂掛；窗簾"], ["dreadful", "可怕的"], ["dresser", "梳妝台"], ["dressing", "穿衣；調味醬"],
+    ["driveway", "私人車道"], ["duration", "持續期間"], ["dusk", "黃昏"], ["dwarf", "侏儒"],
+    ["dwell", "居住"], ["dwelling", "住處"], ["eclipse", "日蝕；月蝕"], ["eel", "鰻魚"],
+    ["ego", "自我"], ["elaborate", "精細的"], ["elevate", "提升"], ["embrace", "擁抱"],
+    ["endeavor", "努力"], ["enroll(ment)", "註冊"], ["ensure/insure", "確保"], ["enterprise", "企業"],
+    ["enthusiastic", "熱情的"], ["entitle", "給予權利；命名"], ["equate", "視為相等"], ["erect", "豎立"],
+    ["erupt", "爆發"], ["escort", "護送"], ["estate", "地產"], ["esteem", "尊敬"],
+    ["eternal", "永恆的"], ["ethic(s)", "道德"], ["evergreen", "常綠的"], ["exaggeration", "誇張"],
+    ["exceed", "超過"], ["excel", "擅長"], ["exceptional", "例外的；傑出的"], ["excess", "過量"],
+    ["exclaim", "驚呼"], ["exclude", "排除"], ["execute", "執行；處決"], ["executive", "執行的；主管"],
+    ["exile", "流亡"], ["extension", "延伸；分機"], ["extensive", "廣泛的"], ["exterior", "外部"],
+    ["external", "外部的"], ["extinct", "絕種的"], ["extraordinary", "非凡的"], ["eyelash/lash", "睫毛"],
+    ["eyelid", "眼皮"], ["fabric", "布料"], ["fad", "一時的流行"], ["Fahrenheit", "華氏"],
+    ["falter", "結巴；動搖"], ["fascinate", "使著迷"], ["fatigue", "疲勞"], ["federal", "聯邦的"],
+    ["feeble", "虛弱的"], ["feminine", "女性的"], ["fertilizer", "肥料"], ["fiancé/fiancée", "未婚夫/妻"],
+    ["fiber", "纖維"], ["fiddle", "小提琴；撥弄"], ["filter", "過濾"], ["fin", "鰭"],
+    ["fishery", "漁業"], ["flake", "薄片"], ["flap", "拍動"], ["flaw", "缺陷"],
+    ["flick", "輕彈"], ["flip", "翻轉"], ["flourish", "繁榮；茂盛"], ["fluency", "流利"],
+    ["foe", "敵人"], ["foil", "箔；陪襯"], ["folklore", "民間傳說"], ["forgetful", "健忘的"],
+    ["format", "格式"], ["foul", "污穢的；犯規"], ["fowl", "家禽"], ["fraction", "分數；小部分"],
+    ["framework", "架構"], ["frantic", "發狂的"], ["freight", "貨運"], ["frontier", "邊境"],
+    ["fume", "煙；憤怒"], ["fury", "盛怒"], ["fuse", "保險絲；導火線"], ["fuss", "大驚小怪"],
+    ["gallop", "奔馳"], ["garment", "服裝"], ["gasp", "喘氣"], ["gathering", "聚會"],
+    ["gay", "快樂的；同性戀的"], ["gender", "性別"], ["geographical", "地理的"], ["geometry", "幾何學"],
+    ["glacier", "冰河"], ["glare", "怒視；眩光"], ["gleam", "微光"], ["glee", "歡喜"],
+    ["glitter", "閃爍"], ["gloom", "陰暗；憂鬱"], ["gnaw", "啃"], ["gobble", "狼吞虎嚥"],
+    ["gorge (1) (2)", "峽谷；狼吞虎嚥"], ["gorgeous", "華麗的"], ["gorilla", "大猩猩"], ["gospel", "福音"],
+    ["grant", "給予；准許"], ["gravity", "地心引力"], ["graze", "吃草；擦傷"], ["grease", "油脂"],
+    ["greed", "貪婪"], ["grim", "嚴肅的；陰森的"], ["grip", "緊握"], ["groan", "呻吟"],
+    ["gross", "總共的；粗俗的"], ["growl", "低吼"], ["grumble", "發牢騷"], ["guideline", "指導方針"],
+    ["gulp", "大口吞"], ["gust", "一陣強風"], ["gut", "腸子；勇氣"], ["gypsy", "吉普賽人"],
+    ["hail", "冰雹；歡呼"], ["hairstyle/hairdo", "髮型"], ["handicap", "障礙"], ["handicraft", "手工藝"],
+    ["hardy", "耐寒的；強壯的"], ["harness", "馬具；利用"], ["haul", "拖拉"], ["haunt", "出沒；縈繞"],
+    ["hearty", "衷心的；豐盛的"], ["heavenly", "天堂的"], ["hedge", "樹籬"], ["heed", "留心"],
+    ["heighten", "增高；加強"], ["heir", "繼承人"], ["hence", "因此"], ["herald", "預兆；傳令官"],
+    ["herb", "藥草"], ["hermit", "隱士"], ["heroic", "英勇的"], ["heterosexual", "異性戀的"],
+    ["hi-fi", "高傳真音響"], ["hijack", "劫機"], ["hiss", "發出嘶嘶聲"], ["hoarse", "沙啞的"],
+    ["hockey", "曲棍球"], ["homosexual", "同性戀的"], ["honk", "按喇叭"], ["hood", "頭巾；引擎蓋"],
+    ["hoof", "蹄"], ["horizontal", "水平的"], ["hostage", "人質"], ["hostile", "有敵意的"],
+    ["hound", "獵犬"], ["housing", "住宅"], ["hover", "盤旋"], ["howl", "長嚎"],
+    ["hurl", "猛投"], ["hymn", "聖歌"], ["idiot", "白痴"], ["immense", "巨大的"],
+    ["imperial", "帝國的"], ["impose", "強加"], ["impulse", "衝動"], ["incense", "香；激怒"],
+    ["index", "索引；指數"], ["indifference", "冷漠"], ["indifferent", "冷漠的"], ["indignant", "憤慨的"],
+    ["indispensable", "不可或缺的"], ["induce", "引起；勸誘"], ["indulge", "沈溺"], ["infinite", "無限的"],
+    ["inherit", "繼承"], ["initiate", "開始；發起"], ["inland", "內陸的"], ["innumerable", "無數的"],
+    ["inquire", "詢問"], ["institute", "機構；制定"], ["insure", "投保"], ["intent", "意圖"],
+    ["interference", "干擾"], ["interior", "內部的"], ["interpretation", "解釋；口譯"], ["interpreter", "口譯員"],
+    ["intuition", "直覺"], ["inward", "向內的"], ["isle", "小島"], ["issue", "議題；發行"],
+    ["ivy", "常春藤"], ["jack", "千斤頂"], ["jade", "玉"], ["janitor", "工友；管理員"],
+    ["jasmine", "茉莉花"], ["jaywalk", "違規穿越馬路"], ["jeer", "嘲笑"], ["jingle", "叮噹聲"],
+    ["jolly", "愉快的"], ["journalism", "新聞業"], ["journalist", "新聞記者"], ["jug", "壺"],
+    ["jury", "陪審團"], ["justify", "證明...是正當的"], ["juvenile", "青少年的"], ["kin", "親戚"],
+    ["kindle", "點燃"], ["knowledgeable", "博學的"], ["lad", "少年"], ["lame", "跛的；無說服力的"],
+    ["landlady", "女房東"], ["landlord", "房東"], ["laser", "雷射"], ["latitude", "緯度"],
+    ["lawmaker", "立法委員"], ["layer", "層"], ["league", "聯盟"], ["legislation", "立法"],
+    ["lessen", "減少"], ["lest", "以免"], ["lieutenant", "中尉"], ["lifelong", "終身的"],
+    ["likelihood", "可能性"], ["lime", "萊姆；石灰"], ["limp", "跛行"], ["linger", "逗留"],
+    ["livestock", "家畜"], ["lizard", "蜥蜴"], ["locomotive", "火車頭"], ["locust", "蝗蟲"],
+    ["lodge", "小屋；寄宿"], ["lofty", "高聳的；崇高的"], ["logo", "商標"], ["lonesome", "寂寞的"],
+    ["longitude", "經度"], ["lottery", "樂透"], ["lotus", "蓮花"], ["lumber", "木材"],
+    ["lump", "腫塊；小塊"], ["magnify", "放大"], ["maiden", "少女；初次的"], ["mainland", "大陸"],
+    ["mainstream", "主流"], ["maintenance", "維修；維持"], ["majestic", "雄偉的"], ["majesty", "威嚴；陛下"],
+    ["mammal", "哺乳動物"], ["manifest", "顯示；明顯的"], ["mansion", "豪宅"], ["maple", "楓樹"],
+    ["marginal", "邊緣的"], ["marine", "海洋的"], ["marshal", "元帥；局長"], ["martial", "軍事的"],
+    ["marvel", "驚奇"], ["masculine", "男性的"], ["mash", "搗碎"], ["massage", "按摩"],
+    ["massive", "巨大的"], ["masterpiece", "傑作"], ["mayonnaise", "美乃滋"], ["meantime", "同時"],
+    ["mechanics", "力學"], ["mediate", "調停"], ["menace", "威脅"], ["mermaid", "美人魚"],
+    ["midst", "中間"], ["migrant", "移居者"], ["mileage", "哩程數"], ["milestone", "里程碑"],
+    ["mingle", "混合"], ["minimal", "最小的"], ["mint", "薄荷；鑄幣廠"], ["miser", "守財奴"],
+    ["mistress", "女主人；情婦"], ["moan", "呻吟"], ["mock", "嘲笑；模擬的"], ["mode", "模式"],
+    ["modernize", "現代化"], ["modify", "修改"], ["mold (2)", "模子；霉"], ["molecule", "分子"],
+    ["monarch", "君主"], ["monstrous", "怪異的；巨大的"], ["mortal", "會死的；凡人"], ["moss", "青苔"],
+    ["motherhood", "母性"], ["motive", "動機"], ["mound", "土堆"], ["mount", "登上；山"],
+    ["mourn", "哀悼"], ["mower", "除草機"], ["mumble", "含糊地說"], ["muscular", "肌肉發達的"],
+    ["muse", "沈思；謬思女神"], ["mustard", "芥末"], ["mutter", "嘀咕"], ["mutton", "羊肉"],
+    ["myth", "神話"], ["nag", "嘮叨"], ["naive", "天真的"], ["nasty", "骯髒的；惡劣的"],
+    ["navigate", "航行；導航"], ["newscast", "新聞廣播"], ["nibble", "小口咬"], ["nickel", "鎳；五分錢"],
+    ["nightingale", "夜鶯"], ["nominate", "提名"], ["nonetheless", "儘管如此"], ["nonviolent", "非暴力的"],
+    ["nostril", "鼻孔"], ["notable", "顯著的"], ["noticeable", "顯而易見的"], ["notify", "通知"],
+    ["notion", "概念"], ["novice", "新手"], ["nowhere", "無處"], ["nucleus", "核心；原子核"],
+    ["nude", "裸體的"], ["oar", "槳"], ["oasis", "綠洲"], ["oath", "誓言"],
+    ["oatmeal", "燕麥片"], ["oblong", "長方形的"], ["observer", "觀察者"], ["obstinate", "固執的"],
+    ["occurrence", "發生；事件"], ["octopus", "章魚"], ["odds", "機率；勝算"], ["odor", "氣味"],
+    ["olive", "橄欖"], ["opponent", "對手"], ["optimism", "樂觀"], ["orchard", "果園"],
+    ["organizer", "組織者"], ["orient", "東方；適應"], ["oriental", "東方的"], ["ornament", "裝飾品"],
+    ["orphanage", "孤兒院"], ["ostrich", "鴕鳥"], ["ounce", "盎司"], ["outdo", "勝過"],
+    ["outgoing", "外向的"], ["output", "產量；輸出"], ["outsider", "局外人"], ["outskirts", "郊區"],
+    ["outward", "向外的"], ["overall", "整體的"], ["overdo", "做過頭"], ["overeat", "吃太飽"],
+    ["overflow", "溢出"], ["overhear", "無意中聽到"], ["oversleep", "睡過頭"], ["overwhelm", "壓倒；淹沒"],
+    ["overwork", "工作過度"], ["oyster", "牡蠣"], ["ozone", "臭氧"], ["pacific", "平靜的"],
+    ["packet", "小包"], ["paddle", "槳；划"], ["paradox", "矛盾"], ["pane", "窗格"],
+    ["parallel", "平行的"], ["parlor", "起居室；店舖"], ["participant", "參加者"], ["particle", "微粒"],
+    ["partly", "部分地"], ["passionate", "熱情的"], ["pastime", "消遣"], ["pastry", "糕點"],
+    ["patch", "補丁"], ["patent", "專利"], ["patriot", "愛國者"], ["patrol", "巡邏"],
+    ["patron", "贊助者；老顧客"], ["peacock", "孔雀"], ["peasant", "農夫"], ["peck", "啄"],
+    ["peddler", "小販"], ["peek", "偷看"], ["peg", "釘子；掛鉤"], ["penetrate", "穿透"],
+    ["perceive", "察覺；感知"], ["perch", "棲息"], ["performer", "表演者"], ["peril", "危險"],
+    ["perish", "死亡；毀滅"], ["permissible", "可允許的"], ["persist", "堅持"], ["personnel", "人員"],
+    ["pessimism", "悲觀"], ["pier", "碼頭"], ["pilgrim", "朝聖者"], ["pillar", "柱子"],
+    ["pimple", "青春痘"], ["pinch", "捏"], ["piss", "小便"], ["pistol", "手槍"],
+    ["plague", "瘟疫"], ["plantation", "大農場"], ["playwright", "劇作家"], ["plea", "懇求"],
+    ["plead", "辯護；懇求"], ["pledge", "保證；誓言"], ["plow", "犁；耕"], ["pluck", "拔；彈奏"],
+    ["plunge", "投入；跳入"], ["pocketbook", "皮夾；筆記本"], ["poetic", "詩的"], ["poke", "戳"],
+    ["poultry", "家禽"], ["polar", "極地的"], ["porch", "門廊"], ["potential", "潛在的"],
+    ["prairie", "大草原"], ["preach", "佈道"], ["precaution", "預防措施"], ["preference", "偏好"],
+    ["prehistoric", "史前的"], ["prevail", "盛行；戰勝"], ["preview", "預習；預告"], ["prey", "獵物"],
+    ["priceless", "無價的"], ["prick", "刺"], ["prior", "在先的"], ["priority", "優先"],
+    ["procession", "行列"], ["profile", "輪廓；簡介"], ["prolong", "延長"], ["prop", "支撐；道具"],
+    ["prophet", "先知"], ["proportion", "比例"], ["prospect", "前景"], ["province", "省"],
+    ["prune (1) (2)", "修剪；梅乾"], ["publicize", "宣傳"], ["puff", "一陣(風/煙)"], ["pulse", "脈搏"],
+    ["purchase", "購買"], ["pyramid", "金字塔"], ["quack", "呱呱聲；庸醫"], ["qualify", "使具資格"],
+    ["quart", "誇脫"], ["quest", "尋求"], ["quiver", "顫抖"], ["rack (1) (2)", "架子；折磨"],
+    ["radish", "蘿蔔"], ["radius", "半徑"], ["ragged", "破爛的"], ["rail", "欄杆；鐵軌"],
+    ["rally", "集會"], ["ranch", "大牧場"], ["rascal", "流氓"], ["ratio", "比率"],
+    ["rattle", "嘎嘎聲"], ["realm", "王國；領域"], ["reap", "收割"], ["rear", "後方；撫養"],
+    ["reckless", "魯莽的"], ["reckon", "計算；認為"], ["recommend", "推薦"], ["reef", "礁"],
+    ["reel", "捲軸；蹣跚"], ["referee/umpire", "裁判"], ["refuge/sanctuary", "避難所"], ["refute", "反駁"],
+    ["reign", "統治"], ["rejoice", "欣喜"], ["relic", "遺跡"], ["reminder", "提醒物"],
+    ["repay", "償還"], ["reproduce", "繁殖；複製"], ["reptile", "爬蟲類"], ["republican", "共和主義者"],
+    ["resent(ment)", "憤恨"], ["reside", "居住"], ["residence", "住所"], ["resident", "居民"],
+    ["resort", "度假勝地；訴諸"], ["restrain", "克制"], ["resume", "恢復；履歷表"], ["retort", "反駁"],
+    ["reverse", "倒轉；相反的"], ["revive", "甦醒；復興"], ["revolt", "反叛"], ["revolve", "旋轉"],
+    ["rhinoceros/rhino", "犀牛"], ["rib", "肋骨"], ["ridge", "山脊"], ["ridiculous", "荒謬的"],
+    ["rifle", "步槍"], ["rigid", "嚴格的；堅硬的"], ["rim", "邊緣"], ["rip", "撕裂"],
+    ["ripple", "漣漪"], ["rival", "對手"], ["roam", "漫遊"], ["robin", "知更鳥"],
+    ["robust", "強壯的"], ["rod", "竿"], ["rubbish", "垃圾"], ["rugged", "崎嶇的"],
+    ["rumble", "隆隆聲"], ["rustle", "沙沙聲"], ["sacred", "神聖的"], ["saddle", "馬鞍"],
+    ["saint", "聖人"], ["salmon", "鮭魚"], ["salute", "敬禮"], ["sandal", "涼鞋"],
+    ["savage", "野蠻的"], ["scan", "掃描；瀏覽"], ["scandal", "醜聞"], ["scar", "傷疤"],
+    ["scent", "氣味"], ["scheme", "計畫；詭計"], ["scorn", "輕視"], ["scramble", "攀爬；爭奪"],
+    ["scrap", "廢料"], ["scrape", "刮；擦傷"], ["scroll", "卷軸"], ["sculptor", "雕刻家"],
+    ["secure", "安全的；獲得"], ["segment", "部分"], ["sensation", "感覺；轟動"], ["sensitivity", "敏感性"],
+    ["sentiment", "感情"], ["sergeant", "中士；警官"], ["series", "系列"], ["sermon", "佈道"],
+    ["server", "服務生；伺服器"], ["setting", "環境；背景"], ["shabby", "破舊的"], ["sharpen", "削尖"],
+    ["shatter", "粉碎"], ["sheriff", "警長"], ["shield", "盾牌；保護"], ["shiver", "顫抖"],
+    ["shortage", "短缺"], ["shortcoming", "缺點"], ["shove", "推擠"], ["shred", "碎條"],
+    ["shriek", "尖叫"], ["shrine", "神社；聖地"], ["shrub", "灌木"], ["shudder", "發抖"],
+    ["shutter", "百葉窗；快門"], ["silkworm", "蠶"], ["simmer", "燉"], ["skeleton", "骨骸"],
+    ["skull", "頭骨"], ["slam", "猛關"], ["slap", "賞耳光"], ["slaughter", "屠殺"],
+    ["slay", "殺害"], ["sloppy", "邋遢的"], ["slump", "暴跌；消沈"], ["sly", "狡猾的"],
+    ["smash", "粉碎"], ["snarl", "咆哮"], ["snatch", "搶奪"], ["sneak", "鬼鬼祟祟地走"],
+    ["sneaker(s)", "運動鞋"], ["sniff", "嗅"], ["snore", "打呼"], ["snort", "噴鼻息"],
+    ["soak", "浸泡"], ["sober", "清醒的"], ["soften", "軟化"], ["sole (1) (2)", "腳底；唯一的"],
+    ["solemn", "莊嚴的"], ["solitary", "孤獨的"], ["solo", "獨奏"], ["sovereign", "最高統治者"],
+    ["sow", "播種"], ["spacecraft", "太空船"], ["specialist", "專家"], ["specimen", "標本"],
+    ["spectacle", "奇觀；眼鏡"], ["spectator", "觀眾"], ["spine", "脊椎"], ["splendor", "壯麗"],
+    ["sponge", "海綿"], ["spotlight", "聚光燈"], ["sprint", "衝刺"], ["spur", "馬刺；激勵"],
+    ["squash (1)", "壓扁；南瓜"], ["squat", "蹲"], ["stack", "堆"], ["stagger", "蹣跚"],
+    ["stain", "污漬"], ["stake", "樁；賭注"], ["stalk (1)", "莖；跟蹤"], ["stall", "攤位；熄火"],
+    ["stanza", "詩節"], ["startle", "使受驚"], ["statesman", "政治家"], ["statistic(s)", "統計數值"],
+    ["statistical", "統計的"], ["steamer (1)", "汽船；蒸籠"], ["steer", "駕駛"], ["stereotype", "刻板印象"],
+    ["stern", "嚴厲的；船尾"], ["stew", "燉"], ["steward/stewardess/attendant", "服務員"], ["stink", "發臭"],
+    ["stock (1)", "庫存；股票"], ["stoop", "彎腰"], ["storage", "儲存"], ["stout", "結實的；矮胖的"],
+    ["straighten", "弄直"], ["straightforward", "率直的"], ["strain", "拉緊；盡力"], ["strait", "海峽"],
+    ["strand", "擱淺；一縷"], ["strap", "皮帶"], ["stray", "迷路"], ["streak", "條紋"],
+    ["stride", "大步走"], ["stripe", "條紋"], ["stroll", "散步"], ["structural", "結構的"],
+    ["stumble", "絆倒"], ["stump", "樹樁"], ["stun", "使昏迷；使震驚"], ["sturdy", "堅固的"],
+    ["stutter", "結巴"], ["stylish", "時髦的"], ["submit", "提交；屈服"], ["substantial", "大量的"],
+    ["substitute", "代替"], ["suitcase", "手提箱"], ["sulfur", "硫磺"], ["summon", "召喚"],
+    ["superficial", "表面的"], ["superstition", "迷信"], ["supervise", "監督"], ["supervisor", "監督者"],
+    ["suppress", "鎮壓"], ["supreme", "至高無上的"], ["surge", "洶湧"], ["suspend", "懸掛；暫停"],
+    ["sustain", "維持"], ["swamp", "沼澤"], ["swarm", "群"], ["sympathize", "同情"],
+    ["tackle", "處理；擒抱"], ["tan", "曬黑"], ["tangle", "糾結"], ["tar", "柏油"],
+    ["tart", "塔(點心)"], ["taunt", "嘲弄"], ["tavern", "酒館"], ["teller", "出納員"],
+    ["tempo", "節奏"], ["tempt", "誘惑"], ["temptation", "誘惑(名詞)"], ["tenant", "房客"],
+    ["tentative", "暫時的"], ["terminal", "終點站；航廈"], ["terrace", "露台"], ["thigh", "大腿"],
+    ["thorn", "刺"], ["thrill", "興奮"], ["thriller", "驚悚片"], ["throne", "王位"],
+    ["throng", "群眾"], ["thrust", "猛推"], ["tick", "滴答聲"], ["tile", "磁磚"],
+    ["tilt", "傾斜"], ["tin", "錫；罐頭"], ["tiptoe", "踮腳尖"], ["toad", "蟾蜍"],
+    ["toil", "辛勞"], ["token", "象徵；代幣"], ["torch", "火把"], ["torment", "折磨"],
+    ["torrent", "急流"], ["torture", "拷打"], ["tournament", "錦標賽"], ["toxic", "有毒的"],
+    ["trademark", "商標"], ["traitor", "叛徒"], ["tramp", "流浪漢；重步行走"], ["trample", "踐踏"],
+    ["transparent", "透明的"], ["treasury", "國庫"], ["treaty", "條約"], ["trench", "溝渠"],
+    ["tribute", "貢品；敬意"], ["trifle", "瑣事"], ["trim", "修剪"], ["triple", "三倍的"],
+    ["trot", "小跑"], ["trout", "鱒魚"], ["tuck", "塞"], ["tuition", "學費"],
+    ["tuna", "鮪魚"], ["tyrant", "暴君"], ["umpire", "裁判"], ["undergraduate", "大學生"],
+    ["underline", "畫底線"], ["underneath", "在...下面"], ["understandable", "可理解的"], ["undoubtedly", "無疑地"],
+    ["update", "更新"], ["upright", "直立的"], ["upward", "向上的"], ["utter", "發出聲音；完全的"],
+    ["vacancy", "空缺"], ["vacuum", "真空；吸塵器"], ["vague", "模糊的"], ["vanity", "虛榮"],
+    ["vapor", "蒸氣"], ["vegetation", "植被"], ["veil", "面紗"], ["vein", "靜脈"],
+    ["velvet", "絲絨"], ["venture", "冒險"], ["verbal", "口頭的"], ["versus", "對抗"],
+    ["vertical", "垂直的"], ["veto", "否決"], ["via", "經由"], ["vibrate", "震動"],
+    ["videotape", "錄影帶"], ["viewer", "觀眾"], ["vigor", "活力"], ["vigorous", "精力充沛的"],
+    ["villain", "反派角色"], ["vine", "藤蔓"], ["violinist", "小提琴家"], ["visa", "簽證"],
+    ["vow", "誓言"], ["wade", "涉水"], ["wail", "痛哭"], ["ward (1) (2)", "病房；監護"],
+    ["ware", "器皿"], ["warehouse", "倉庫"], ["warrior", "戰士"], ["wary", "謹慎的"],
+    ["weary", "疲憊的"], ["weird", "怪異的"], ["wharf", "碼頭"], ["wheelchair", "輪椅"],
+    ["whereabouts", "行蹤"], ["whereas", "然而"], ["whine", "哀鳴"], ["whirl", "旋轉"],
+    ["whisk", "拂去；攪拌器"], ["whiskey/whisky", "威士忌"], ["wholesale", "批發"], ["wholesome", "有益健康的"],
+    ["widespread", "廣泛的"], ["widow/widower", "寡婦/鰥夫"], ["wig", "假髮"], ["wilderness", "荒野"],
+    ["wildlife", "野生生物"], ["wither", "枯萎"], ["woe", "悲痛"], ["woodpecker", "啄木鳥"],
+    ["workshop", "研討會；工作坊"], ["worship", "崇拜"], ["worthwhile", "值得的"], ["worthy", "值得的；配得上的"],
+    ["wreath", "花圈"], ["wring", "擰"], ["yacht", "遊艇"], ["yarn", "紗線"],
+    ["yeast", "酵母"], ["yield", "產出；屈服"], ["yoga", "瑜珈"], ["zinc", "鋅"],
+    ["zip/ZIP", "郵遞區號；拉鍊"], ["zoom", "鏡頭拉近；呼嘯而過"]
+  
+    ];
+
+    const dataLevel6 = [
+        ["abbreviate", "縮寫"], ["abbreviation", "縮寫詞"], ["abnormal", "不正常的"], ["aboriginal", "原住民的"],
+    ["aborigine", "原住民"], ["abound", "充滿"], ["absentminded", "心不在焉的"], ["abstraction", "抽象"],
+    ["abundance", "豐富"], ["abuse", "濫用；虐待"], ["accelerate", "加速"], ["acceleration", "加速；加速度"],
+    ["accessible", "可接近的"], ["accessory", "配件"], ["accommodate", "容納；提供住宿"], ["accommodation", "住宿"],
+    ["accord", "一致；符合"], ["accordance", "一致"], ["accordingly", "因此"], ["accountable", "應負責任的"],
+    ["accounting", "會計"], ["accumulate", "累積"], ["accumulation", "累積(名詞)"], ["accusation", "指控"],
+    ["acquisition", "獲得"], ["activist", "激進分子"], ["acute", "敏銳的；急性的"], ["adaptation", "適應；改編"],
+    ["addict", "成癮者"], ["addiction", "成癮"], ["administer/administrate", "管理；執行"], ["administration", "管理；行政"],
+    ["administrative", "行政的"], ["administrator", "行政人員"], ["advocate", "提倡；擁護者"], ["affectionate", "深情的"],
+    ["affirm", "斷言；確認"], ["aggression", "侵略"], ["alcoholic", "酒精的；酗酒者"], ["alienate", "使疏遠"],
+    ["alliance", "聯盟"], ["allocate", "分配"], ["alongside", "在...旁邊"], ["alternative", "替代的"],
+    ["ambiguity", "模稜兩可"], ["ambiguous", "含糊不清的"], ["ambulance", "救護車"], ["ambush", "埋伏"],
+    ["amiable", "和藹可親的"], ["amplify", "放大(聲音)"], ["analects", "文選；論語"], ["analogy", "類比"],
+    ["analyst", "分析師"], ["analytical", "分析的"], ["anecdote", "軼事"], ["animate", "使有活力；動畫的"],
+    ["annoyance", "煩惱"], ["anonymous", "匿名的"], ["Antarctic", "南極的"], ["antenna", "天線；觸角"],
+    ["antibiotic", "抗生素"], ["antibody", "抗體"], ["anticipate", "預期"], ["anticipation", "期待"],
+    ["antonym", "反義字"], ["applicable", "適用的"], ["apprentice", "學徒"], ["approximate", "大約的"],
+    ["aptitude", "資質；性向"], ["Arctic", "北極的"], ["arrogant", "傲慢的"], ["artery", "動脈"],
+    ["articulate", "清晰地表達"], ["artifact", "手工藝品"], ["assassinate", "暗殺"], ["assert", "斷言"],
+    ["assess(ment)", "評估"], ["assumption", "假設"], ["asthma", "氣喘"], ["asylum", "庇護所"],
+    ["attain(ment)", "達成"], ["attendant", "服務員"], ["attic", "閣樓"], ["auction", "拍賣"],
+    ["authentic", "真實的"], ["authorize", "授權"], ["autograph", "親筆簽名"], ["autonomy", "自治"],
+    ["aviation", "航空"], ["awesome", "令人敬畏的；極好的"], ["barometer", "氣壓計"], ["beckon", "招手"],
+    ["besiege", "包圍"], ["betray", "背叛"], ["beverage", "飲料"], ["bias", "偏見"],
+    ["binoculars", "雙筒望遠鏡"], ["biochemistry", "生物化學"], ["biological", "生物的"], ["bizarre", "古怪的"],
+    ["bleak", "荒涼的"], ["blunder", "大錯"], ["blunt", "鈍的；直率的"], ["bombard", "砲擊"],
+    ["bondage", "束縛；奴役"], ["boost", "促進；增加"], ["bout", "一回合；發作"], ["boycott", "抵制"],
+    ["breakdown", "故障；崩潰"], ["breakthrough", "突破"], ["breakup", "分手；解散"], ["brew", "釀造；沖泡"],
+    ["brink", "邊緣"], ["brisk", "輕快的"], ["brochure", "小冊子"], ["brute", "野獸；殘暴的人"],
+    ["buckle", "扣住；扣環"], ["bulky", "笨重的"], ["bureaucracy", "官僚體制"], ["burial", "埋葬"],
+    ["byte", "位元組"], ["caffeine", "咖啡因"], ["calcium", "鈣"], ["canvas", "帆布；油畫布"],
+    ["capability", "能力"], ["capsule", "膠囊"], ["caption", "標題；字幕"], ["captive", "俘虜"],
+    ["captivity", "囚禁"], ["carbohydrate", "碳水化合物"], ["caress", "撫摸"], ["carol", "頌歌"],
+    ["cashier", "出納員"], ["casualty", "傷亡人員"], ["catastrophe", "大災難"], ["cater", "迎合；提供外燴"],
+    ["cavalry", "騎兵"], ["cavity", "蛀牙；洞"], ["cemetery", "墓地"], ["certainty", "確定性"],
+    ["certify", "證明"], ["champagne", "香檳"], ["chaos", "混亂"], ["characterize", "描繪...的特性"],
+    ["charcoal", "木炭"], ["chariot", "雙輪戰車"], ["charitable", "慈善的"], ["cholesterol", "膽固醇"],
+    ["chronic", "慢性的"], ["chuckle", "輕聲笑"], ["chunk", "大塊"], ["civilize", "教化"],
+    ["clamp", "夾住；鉗子"], ["clarity", "清晰"], ["cleanse", "清潔"], ["clearance", "清除；許可"],
+    ["clench", "緊握"], ["clinical", "臨床的"], ["clone", "複製"], ["closure", "關閉；終止"],
+    ["coffin", "棺材"], ["coherent", "連貫的"], ["coincide", "巧合；同時發生"], ["coincidence", "巧合"],
+    ["collective", "集體的"], ["collector", "收藏家"], ["collide", "碰撞"], ["collision", "碰撞(名詞)"],
+    ["colloquial", "口語的"], ["columnist", "專欄作家"], ["commemorate", "紀念"], ["commence", "開始"],
+    ["commentary", "評論"], ["commitment", "承諾；奉獻"], ["communicative", "善於溝通的"], ["companionship", "友誼"],
+    ["comparable", "可比較的"], ["comparative", "比較的"], ["compatible", "相容的"], ["compensate", "補償"],
+    ["compensation", "補償(名詞)"], ["competence", "能力"], ["competent", "有能力的"], ["compile", "彙編"],
+    ["complement", "補充；補足物"], ["complexion", "氣色"], ["complexity", "複雜性"], ["complication", "併發症；複雜化"],
+    ["component", "零件；成分"], ["comprehensive", "綜合的；詳盡的"], ["comprise", "包含；由...組成"], ["concede", "讓步；承認"],
+    ["conceit", "自大"], ["conception", "概念；懷孕"], ["concession", "讓步"], ["concise", "簡潔的"],
+    ["condense", "濃縮"], ["confer", "商討；授予"], ["confidential", "機密的"], ["conform", "遵守；符合"],
+    ["confrontation", "對抗"], ["congressman/congresswoman", "國會議員"], ["conquest", "征服"], ["conscientious", "認真的"],
+    ["consensus", "共識"], ["conservation", "保育"], ["consolation", "安慰"], ["conspiracy", "陰謀"],
+    ["constituent", "選民；成分"], ["consultation", "諮詢"], ["consumption", "消耗"], ["contemplation", "沈思"],
+    ["contestant", "參賽者"], ["contractor", "承包商"], ["contradict", "反駁；與...矛盾"], ["contradiction", "矛盾"],
+    ["controversial", "有爭議的"], ["controversy", "爭議"], ["conviction", "定罪；確信"], ["coordinate", "協調"],
+    ["cordial", "熱忱的"], ["core", "核心"], ["corporate", "公司的"], ["corps", "軍團"],
+    ["corpse", "屍體"], ["correspondent", "特派員；通信者"], ["corruption", "貪污"], ["cosmetic", "化妝用的"],
+    ["cosmetics", "化妝品"], ["cosmopolitan", "世界性的"], ["counterpart", "相對應的人或物"], ["coverage", "報導；保險範圍"],
+    ["covet", "覬覦"], ["cramp", "抽筋"], ["credibility", "可信度"], ["credible", "可信的"],
+    ["criterion", "標準"], ["crook", "騙子；彎曲"], ["crooked", "彎曲的；不誠實的"], ["crucial", "關鍵的"],
+    ["crude", "粗糙的；原油"], ["cruise", "巡航；遊輪旅遊"], ["cruiser", "巡洋艦"], ["crumb", "麵包屑"],
+    ["crumble", "粉碎；崩潰"], ["crust", "外殼；地殼"], ["cultivate", "耕種；培養"], ["cumulative", "累積的"],
+    ["customary", "慣例的"], ["daffodil", "水仙花"], ["dandruff", "頭皮屑"], ["daybreak", "黎明"],
+    ["deadly", "致命的"], ["decent", "體面的"], ["decisive", "決定性的"], ["decline", "婉拒；衰退"],
+    ["dedicate", "奉獻"], ["dedication", "奉獻(名詞)"], ["deem", "認為"], ["defect", "缺點；叛逃"],
+    ["deficiency", "缺乏"], ["degrade", "降級；羞辱"], ["deliberate", "故意的；深思熟慮"], ["delinquent", "違法的；拖欠的"],
+    ["denounce", "譴責"], ["density", "密度"], ["dental", "牙齒的"], ["depict", "描繪"],
+    ["deprive", "剝奪"], ["deputy", "副手；代理人"], ["derive", "源自"], ["descend", "下降"],
+    ["descendant", "後代"], ["descent", "血統；下降"], ["designate", "指定"], ["destined", "註定的"],
+    ["detach", "分開"], ["detain", "拘留"], ["deter", "嚇阻"], ["detergent", "清潔劑"],
+    ["deteriorate", "惡化"], ["devalue", "貶值"], ["diabetes", "糖尿病"], ["diagnose", "診斷"],
+    ["diagnosis", "診斷(名詞)"], ["diagram", "圖表"], ["diameter", "直徑"], ["dictate", "口述；命令"],
+    ["dictation", "聽寫"], ["dictator", "獨裁者"], ["differentiate", "區分"], ["dilemma", "進退兩難"],
+    ["dimension", "尺寸；次元"], ["diminish", "減少"], ["diplomacy", "外交"], ["diplomatic", "外交的"],
+    ["directory", "目錄；電話簿"], ["disability", "殘障"], ["disable", "使殘廢；使無效"], ["disapprove", "不贊成"],
+    ["disastrous", "災難性的"], ["discharge", "排放；釋放"], ["disciplinary", "紀律的"], ["disclose", "揭露"],
+    ["disclosure", "揭露(名詞)"], ["discomfort", "不適"], ["discreet", "謹慎的"], ["discrimination", "歧視"],
+    ["disgrace", "恥辱"], ["disgraceful", "丟臉的"], ["dismantle", "拆卸"], ["dismay", "沮喪"],
+    ["dispatch", "派遣"], ["dispensable", "非必要的"], ["disperse", "驅散"], ["displace", "取代；迫使離開"],
+    ["displease", "使不高興"], ["disposable", "拋棄式的"], ["disposal", "處理"], ["disregard", "忽視"],
+    ["dissident", "異議份子"], ["dissolve", "溶解；解散"], ["dissuade", "勸阻"], ["distort", "扭曲"],
+    ["distract", "使分心"], ["distraction", "分心"], ["distrust", "不信任"], ["disturbance", "騷動"],
+    ["diverse", "多樣的"], ["diversify", "使多樣化"], ["diversion", "轉移注意"], ["diversity", "多樣性"],
+    ["divert", "轉移"], ["doctrine", "教義"], ["documentary", "紀錄片"], ["dome", "圓頂"],
+    ["donate", "捐贈"], ["donation", "捐贈(名詞)"], ["donor", "捐贈者"], ["doom", "厄運"],
+    ["dosage", "劑量"], ["drastic", "激烈的"], ["drawback", "缺點"], ["dreary", "沈悶的"],
+    ["drizzle", "毛毛雨"], ["drought", "乾旱"], ["dual", "雙重的"], ["dubious", "可疑的"],
+    ["dynamite", "炸藥"], ["ebb", "退潮；衰退"], ["eccentric", "古怪的"], ["ecology", "生態學"],
+    ["ecstasy", "狂喜"], ["edible", "可食用的"], ["editorial", "社論"], ["electron", "電子"],
+    ["eligible", "有資格的"], ["elite", "菁英"], ["eloquence", "口才"], ["eloquent", "雄辯的"],
+    ["embark", "登船；著手"], ["emigrant", "移民(移出)"], ["emigrate", "移居國外"], ["emigration", "移居"],
+    ["emphatic", "強調的"], ["enact(ment)", "制定法律"], ["enclosure", "附件；圍場"], ["encyclopedia", "百科全書"],
+    ["endurance", "耐力"], ["enhance(ment)", "增強"], ["enlighten(ment)", "啟發"], ["enrich(ment)", "豐富"],
+    ["epidemic", "流行病"], ["episode", "插曲；一集"], ["EQ", "情緒商數"], ["equation", "方程式"],
+    ["equivalent", "相等的"], ["erode", "侵蝕"], ["eruption", "爆發"], ["escalate", "逐步升級"],
+    ["essence", "本質"], ["eternity", "永恆"], ["ethical", "倫理的"], ["ethnic", "種族的"],
+    ["evacuate", "撤離"], ["evolution", "演化"], ["evolve", "演化(動詞)"], ["excerpt", "摘錄"],
+    ["excessive", "過度的"], ["exclusive", "獨家的；排外的"], ["execution", "執行；處決"], ["exert", "運用(力量)"],
+    ["exotic", "異國情調的"], ["expedition", "遠征"], ["expel", "驅逐"], ["expertise", "專業知識"],
+    ["expiration", "到期"], ["expire", "到期(動詞)"], ["explicit", "明確的"], ["exploit", "剝削；利用"],
+    ["exploration", "探索"], ["exquisite", "精緻的"], ["extract", "提煉；拔出"], ["extracurricular", "課外的"],
+    ["eyesight", "視力"], ["fabulous", "極好的"], ["facilitate", "促進"], ["faction", "派系"],
+    ["faculty", "全體教職員；機能"], ["familiarity", "熟悉"], ["famine", "饑荒"], ["fascination", "著迷"],
+    ["feasible", "可行的"], ["federation", "聯邦"], ["feedback", "回饋"], ["fertility", "繁殖力"],
+    ["fidelity", "忠誠"], ["finite", "有限的"], ["fireproof", "防火的"], ["flare", "閃光"],
+    ["fleet", "艦隊"], ["flicker", "閃爍"], ["fling", "拋"], ["fluid", "流體"],
+    ["flutter", "飄動"], ["foresee", "預見"], ["formidable", "令人敬畏的"], ["formulate", "規劃；配方"],
+    ["forsake", "遺棄"], ["forthcoming", "即將到來的"], ["fortify", "加強"], ["foster", "培養；領養"],
+    ["fracture", "骨折"], ["fragile", "易碎的"], ["fragment", "碎片"], ["frail", "虛弱的"],
+    ["fraud", "詐騙"], ["freak", "怪胎"], ["fret", "苦惱"], ["friction", "摩擦"],
+    ["galaxy", "銀河"], ["generalize", "歸納"], ["generate", "產生"], ["generator", "發電機"],
+    ["genetic", "基因的"], ["genetics", "遺傳學"], ["glamour", "魅力"], ["glassware", "玻璃器皿"],
+    ["glisten", "閃耀"], ["gloomy", "陰沈的"], ["GMO", "基因改造生物"], ["graph", "圖表"],
+    ["graphic", "圖解的"], ["grill", "烤架；燒烤"], ["grocer", "雜貨商"], ["grope", "摸索"],
+    ["guerrilla", "游擊隊"], ["habitat", "棲息地"], ["hack", "劈；駭入"], ["hacker", "駭客"],
+    ["hail (2)", "冰雹；歡呼"], ["harass(ment)", "騷擾"], ["hazard", "危險"], ["hemisphere", "半球"],
+    ["hereafter", "此後"], ["heritage", "遺產"], ["heroin", "海洛因"], ["highlight", "強調；最精彩的部分"],
+    ["honorary", "榮譽的"], ["hormone", "荷爾蒙"], ["hospitable", "好客的"], ["hospitality", "好客"],
+    ["hospitalize", "送醫治療"], ["hostility", "敵意"], ["humanitarian", "人道主義的"], ["humiliate", "羞辱"],
+    ["hunch", "直覺"], ["hurdle", "障礙"], ["hygiene", "衛生"], ["hypocrisy", "偽善"],
+    ["hypocrite", "偽君子"], ["hysterical", "歇斯底里的"], ["illuminate", "照亮"], ["illusion", "幻覺"],
+    ["immune", "免疫的"], ["imperative", "必要的"], ["implement", "實施"], ["implication", "暗示"],
+    ["implicit", "含蓄的"], ["imposing", "壯觀的"], ["imprison(ment)", "監禁"], ["incentive", "誘因"],
+    ["incidental", "附帶的"], ["incline", "傾斜；傾向"], ["inclusive", "包含的"], ["indignation", "憤慨"],
+    ["inevitable", "不可避免的"], ["infectious", "傳染性的"], ["infer", "推斷"], ["inference", "推論"],
+    ["ingenious", "巧妙的；足智多謀的"], ["ingenuity", "獨創性"], ["inhabit", "居住"], ["inhabitant", "居民"],
+    ["inherent", "與生俱來的"], ["initiative", "主動"], ["inject", "注射"], ["injection", "注射(名詞)"],
+    ["injustice", "不公"], ["innovation", "創新"], ["innovative", "創新的"], ["inquiry", "詢問"],
+    ["insight", "洞察力"], ["insistence", "堅持"], ["installation", "安裝"], ["installment", "分期付款"],
+    ["institution", "機構"], ["intact", "完好無缺的"], ["integrate", "整合"], ["integration", "整合(名詞)"],
+    ["integrity", "正直"], ["intellect", "智力"], ["intersection", "十字路口"], ["interval", "間隔"],
+    ["intervene", "介入"], ["intervention", "干涉"], ["intimacy", "親密"], ["intimidate", "威脅"],
+    ["intrude", "侵入"], ["intruder", "入侵者"], ["invaluable", "無價的"], ["inventory", "存貨"],
+    ["investigator", "調查員"], ["IQ", "智商"], ["ironic", "諷刺的"], ["irony", "諷刺"],
+    ["irritable", "易怒的"], ["irritate", "激怒"], ["irritation", "惱怒"], ["joyous", "快樂的"],
+    ["kernel", "核心；果仁"], ["kidnap", "綁架"], ["lament", "哀悼"], ["lava", "熔岩"],
+    ["layman", "門外漢"], ["layout", "版面編排"], ["LCD", "液晶顯示器"], ["legendary", "傳奇的"],
+    ["legislative", "立法的"], ["legislator", "立法委員"], ["legislature", "立法機關"], ["legitimate", "合法的"],
+    ["lengthy", "冗長的"], ["liable", "應負責任的；易於...的"], ["liberate", "解放"], ["liberation", "解放(名詞)"],
+    ["likewise", "同樣地"], ["limousine/limo", "豪華轎車"], ["liner", "定期船；班機"], ["linguist", "語言學家"],
+    ["liter", "公升"], ["literacy", "識字能力"], ["literal", "字面上的"], ["literate", "識字的"],
+    ["longevity", "長壽"], ["lounge", "休息室"], ["lunatic", "瘋子"], ["lure", "引誘"],
+    ["lush", "茂盛的"], ["lyric", "歌詞"], ["magnitude", "規模；震級"], ["malaria", "瘧疾"],
+    ["manipulate", "操縱"], ["manuscript", "手稿"], ["mar", "毀損"], ["massacre", "大屠殺"],
+    ["mastery", "精通"], ["material(ism) (2)", "唯物主義"], ["mattress", "床墊"], ["mechanism", "機制"],
+    ["medication", "藥物治療"], ["medieval", "中世紀的"], ["meditate", "冥想"], ["meditation", "冥想(名詞)"],
+    ["melancholy", "憂鬱"], ["mellow", "成熟的；圓潤的"], ["mentality", "心態"], ["merchandise", "商品"],
+    ["merge", "合併"], ["metaphor", "隱喻"], ["metropolitan", "大都會的"], ["migrate", "遷移"],
+    ["migration", "遷移(名詞)"], ["militant", "激進的"], ["miller", "磨坊主人"], ["mimic", "模仿"],
+    ["miniature", "縮影"], ["minimize", "最小化"], ["miraculous", "奇蹟的"], ["mischievous", "淘氣的"],
+    ["missionary", "傳教士"], ["mobilize", "動員"], ["modernization", "現代化"], ["mold (1)", "模子"],
+    ["momentum", "動量；氣勢"], ["monopoly", "壟斷"], ["monotonous", "單調的"], ["monotony", "單調"],
+    ["morale", "士氣"], ["morality", "道德"], ["motto", "座右銘"], ["mournful", "悲哀的"],
+    ["mouthpiece", "樂器吹口；代言人"], ["municipal", "市立的"], ["mute", "啞的；靜音"], ["mythology", "神話"],
+    ["narrate", "敘述"], ["narrative", "敘述的；故事"], ["narrator", "敘述者"], ["nationalism", "民族主義"],
+    ["naturalist", "自然學家"], ["naval", "海軍的"], ["navel", "肚臍"], ["navigation", "航行"],
+    ["negotiation", "談判"], ["neon", "霓虹燈"], ["neutral", "中立的"], ["newlywed", "新婚夫婦"],
+    ["newscaster", "新聞播報員"], ["nomination", "提名"], ["nominee", "被提名人"], ["norm", "規範"],
+    ["notorious", "惡名昭彰的"], ["nourish(ment)", "滋養"], ["nuisance", "討厭的人事物"], ["nurture", "培育"],
+    ["nutrient", "營養素"], ["nutrition", "營養"], ["nutritious", "營養的"], ["obligation", "義務"],
+    ["oblige", "使不得不；施恩惠"], ["obscure", "模糊的；無名的"], ["offering", "祭品"], ["offspring", "後代"],
+    ["operational", "操作上的"], ["opposition", "反對"], ["oppress", "壓迫"], ["oppression", "壓迫(名詞)"],
+    ["option", "選擇"], ["optional", "可選擇的"], ["ordeal", "嚴酷考驗"], ["orderly", "有秩序的；勤務員"],
+    ["organism", "生物"], ["originality", "獨創性"], ["originate", "發源"], ["outbreak", "爆發"],
+    ["outfit", "全套服裝"], ["outing", "郊遊"], ["outlaw", "罪犯；宣布...非法"], ["outlet", "出口；插座"],
+    ["outlook", "前景；觀點"], ["outnumber", "數量多過"], ["outrage", "暴行；激怒"], ["outrageous", "駭人聽聞的"],
+    ["outright", "完全的；直率的"], ["outset", "開始"], ["overhead", "在頭頂上"], ["overlap", "重疊"],
+    ["overturn", "翻轉；推翻"], ["pact", "協定"], ["pamphlet", "小冊子"], ["paralyze", "使癱瘓"],
+    ["parliament", "議會"], ["pathetic", "可悲的"], ["patriotic", "愛國的"], ["PDA", "個人數位助理"],
+    ["peddle", "兜售"], ["pedestrian", "行人"], ["peninsula", "半島"], ["pension", "退休金"],
+    ["perception", "感知；觀念"], ["perseverance", "毅力"], ["persevere", "堅持"], ["persistence", "堅持(名詞)"],
+    ["persistent", "堅持的"], ["perspective", "觀點；透視法"], ["pesticide", "殺蟲劑"], ["petroleum", "石油"],
+    ["petty", "瑣碎的"], ["pharmacist", "藥劑師"], ["pharmacy", "藥房"], ["phase", "階段"],
+    ["photographic", "攝影的"], ["picturesque", "如畫的"], ["pierce", "刺穿"], ["piety", "虔誠"],
+    ["pious", "虔誠的"], ["pipeline", "管線"], ["pitcher", "投手；水壺"], ["plight", "苦境"],
+    ["pneumonia", "肺炎"], ["poach", "盜獵；水煮"], ["poacher", "盜獵者"], ["pollutant", "污染物"],
+    ["ponder", "沈思"], ["populate", "居住於"], ["posture", "姿勢"], ["precede", "在...之前"],
+    ["precedent", "先例"], ["precision", "精確"], ["predecessor", "前任"], ["prediction", "預測"],
+    ["preface", "序言"], ["prejudice", "偏見"], ["preliminary", "初步的"], ["premature", "過早的"],
+    ["premier", "總理；首要的"], ["prescribe", "開處方"], ["prescription", "處方"], ["preside", "主持"],
+    ["presidency", "總統職位"], ["presidential", "總統的"], ["prestige", "聲望"], ["presume", "假定"],
+    ["preventive", "預防的"], ["productivity", "生產力"], ["proficiency", "精通"], ["profound", "深奧的"],
+    ["progressive", "進步的"], ["prohibit", "禁止"], ["prohibition", "禁止(名詞)"], ["projection", "投射"],
+    ["prone", "易於...的"], ["propaganda", "政治宣傳"], ["propel", "推進"], ["propeller", "螺旋槳"],
+    ["prose", "散文"], ["prosecute", "起訴"], ["prosecution", "起訴(名詞)"], ["prospective", "預期的"],
+    ["provincial", "省的；鄉氣的"], ["provoke", "挑釁"], ["prowl", "潛行"], ["punctual", "準時的"],
+    ["purify", "淨化"], ["purity", "純潔"], ["qualification(s)", "資格"], ["quarrelsome", "愛爭吵的"],
+    ["quench", "解渴；撲滅"], ["query", "詢問"], ["questionnaire", "問卷"], ["racism", "種族主義"],
+    ["radiant", "容光煥發的"], ["radiate", "散發"], ["radiation", "輻射"], ["radiator", "暖氣片"],
+    ["radical", "激進的"], ["raft", "木筏"], ["raid", "突襲"], ["random", "隨機的"],
+    ["ransom", "贖金"], ["rash (1) (2)", "疹子；魯莽的"], ["rational", "理性的"], ["ravage", "破壞"],
+    ["realism", "現實主義"], ["realization", "領悟；實現"], ["rebellion", "叛亂"], ["recession", "經濟衰退"],
+    ["recipient", "接受者"], ["recommendation", "推薦"], ["reconcile", "和解"], ["recreational", "娛樂的"],
+    ["recruit", "招募"], ["recur", "復發"], ["redundant", "多餘的"], ["refine(ment)", "提煉；改良"],
+    ["reflective", "反射的；深思的"], ["refreshment(s)", "茶點"], ["refund", "退款"], ["regardless", "無論如何"],
+    ["regime", "政權"], ["rehearsal", "排演"], ["rehearse", "排演(動詞)"], ["rein", "韁繩"],
+    ["reinforce", "加強"], ["relay", "轉播；接力"], ["relevant", "相關的"], ["reliance", "依賴"],
+    ["relish", "享受；風味"], ["remainder", "剩餘物"], ["removal", "移除"], ["renaissance", "文藝復興"],
+    ["render", "使得；給予"], ["renowned", "著名的"], ["rental", "出租"], ["repress", "壓抑"],
+    ["resemblance", "相似"], ["reservoir", "水庫"], ["residential", "住宅的"], ["resistant", "抵抗的"],
+    ["resolute", "堅決的"], ["respective", "各自的"], ["restoration", "修復"], ["restraint", "克制"],
+    ["retail", "零售"], ["retaliate", "報復"], ["retrieve", "取回"], ["revelation", "揭露"],
+    ["revenue", "收入"], ["revival", "復興"], ["rhetoric", "修辭"], ["rhythmic", "有節奏的"],
+    ["ridicule", "嘲笑"], ["rigorous", "嚴格的"], ["riot", "暴動"], ["rite", "儀式"],
+    ["ritual", "儀式(名詞)"], ["rivalry", "競爭"], ["rotate", "旋轉"], ["rotation", "旋轉(名詞)"],
+    ["royalty", "皇室；版稅"], ["ruby", "紅寶石"], ["safeguard", "保護"], ["saloon", "酒館"],
+    ["salvation", "救贖"], ["sanction", "制裁；認可"], ["sanctuary", "避難所；聖殿"], ["sane", "神智正常的"],
+    ["sanitation", "衛生"], ["scenic", "風景優美的"], ["scope", "範圍"], ["script", "劇本"],
+    ["sector", "部門"], ["seduce", "引誘"], ["selective", "有選擇性的"], ["seminar", "研討會"],
+    ["senator", "參議員"], ["sentimental", "多愁善感的"], ["sequence", "順序"], ["serene", "寧靜的"],
+    ["serenity", "寧靜"], ["serving", "一人份"], ["session", "會議；學期"], ["setback", "挫折"],
+    ["sewer", "下水道"], ["shed", "流出；小屋"], ["sheer", "全然的；陡峭的"], ["shilling", "先令"],
+    ["shoplift", "順手牽羊"], ["shrewd", "精明的"], ["shun", "避開"], ["siege", "圍攻"],
+    ["signify", "象徵"], ["silicon", "矽"], ["simplicity", "簡單"], ["simplify", "簡化"],
+    ["simultaneous", "同時的"], ["skeptical", "懷疑的"], ["skim", "瀏覽；撈掉浮沫"], ["slang", "俚語"],
+    ["slash", "揮砍；大幅削減"], ["slavery", "奴隸制度"], ["slot", "投幣孔；時段"], ["slum", "貧民窟"],
+    ["smack", "拍擊"], ["smallpox", "天花"], ["smother", "使窒息"], ["smuggle", "走私"],
+    ["snare", "陷阱"], ["sneaky", "鬼鬼祟祟的"], ["sneer", "冷笑"], ["soar", "翱翔；暴漲"],
+    ["sociable", "善於社交的"], ["socialism", "社會主義"], ["socialist", "社會主義者"], ["socialize", "交際"],
+    ["sociology", "社會學"], ["sodium", "鈉"], ["solidarity", "團結"], ["solitude", "孤獨"],
+    ["soothe", "撫慰"], ["sophisticated", "世故的；精密的"], ["sovereignty", "主權"], ["spacious", "寬敞的"],
+    ["span", "跨度；一段時間"], ["specialize", "專攻"], ["specialty", "專長；特產"], ["specify", "具體說明"],
+    ["spectacular", "壯觀的"], ["spectrum", "光譜"], ["speculate", "推測；投機"], ["sphere", "球體；領域"],
+    ["spike", "長釘"], ["spiral", "螺旋"], ["spire", "尖塔"], ["spokesperson", "發言人"],
+    ["sponsor", "贊助"], ["spontaneous", "自發的"], ["spouse", "配偶"], ["sprawl", "蔓延"],
+    ["squad", "小隊"], ["squash (2)", "壁球；壓爛"], ["stability", "穩定"], ["stabilize", "使穩定"],
+    ["stalk (2)", "跟蹤"], ["stammer", "結巴"], ["staple", "主食；釘書針"], ["stapler", "釘書機"],
+    ["starch", "澱粉"], ["starvation", "飢餓"], ["stationary", "靜止的"], ["stationery", "文具"],
+    ["stature", "身材；聲望"], ["steamer (2)", "蒸籠"], ["stimulate", "刺激"], ["stimulation", "刺激(名詞)"],
+    ["stimulus", "刺激物"], ["stock (2)", "高湯；家畜"], ["strangle", "勒死"], ["strategic", "策略性的"],
+    ["stunt", "特技"], ["subjective", "主觀的"], ["subordinate", "下屬"], ["subscribe", "訂閱"],
+    ["subscription", "訂閱(名詞)"], ["subsequent", "隨後的"], ["substitution", "代替"], ["subtle", "微妙的"],
+    ["suburban", "郊區的"], ["succession", "繼承；連續"], ["successive", "連續的"], ["successor", "繼承人"],
+    ["suffocate", "使窒息"], ["suite", "套房"], ["superb", "極好的"], ["superiority", "優越"],
+    ["supersonic", "超音速的"], ["superstitious", "迷信的"], ["supervision", "監督"], ["supplement", "補充"],
+    ["surpass", "勝過"], ["surplus", "盈餘"], ["suspense", "懸疑"], ["suspension", "暫停；懸掛"],
+    ["swap", "交換"], ["symbolic", "象徵的"], ["symbolize", "象徵"], ["symmetry", "對稱"],
+    ["symptom", "症狀"], ["synonym", "同義字"], ["synthetic", "合成的"], ["tact", "圓滑"],
+    ["tactic(s)", "策略"], ["tariff", "關稅"], ["tedious", "乏味的"], ["temperament", "氣質"],
+    ["tempest", "暴風雨"], ["terminate", "終止"], ["textile", "紡織品"], ["texture", "質地"],
+    ["theatrical", "戲劇的"], ["theft", "偷竊"], ["theoretical", "理論的"], ["therapist", "治療師"],
+    ["therapy", "治療"], ["thereafter", "之後"], ["thereby", "因此"], ["thermometer", "溫度計"],
+    ["threshold", "門檻"], ["thrift", "節儉"], ["thrifty", "節儉的"], ["thrive", "興盛"],
+    ["throb", "悸動"], ["toll (1) (2)", "通行費；傷亡人數"], ["topple", "推翻"], ["tornado", "龍捲風"],
+    ["trait", "特徵"], ["tranquil", "寧靜的"], ["tranquilizer", "鎮定劑"], ["transaction", "交易"],
+    ["transcript", "成績單；抄本"], ["transformation", "轉變"], ["transistor", "電晶體"], ["transit", "運輸"],
+    ["transition", "過渡期"], ["transmission", "傳送"], ["transmit", "傳送(動詞)"], ["transplant", "移植"],
+    ["trauma", "創傷"], ["tread", "踩踏"], ["treason", "叛國"], ["trek", "長途跋涉"],
+    ["tremor", "震動"], ["trespass", "擅闖"], ["trigger", "觸發"], ["triumphant", "勝利的"],
+    ["trivial", "瑣碎的"], ["trophy", "獎盃"], ["tropic", "回歸線；熱帶"], ["truant", "逃學者"],
+    ["truce", "休戰"], ["tuberculosis", "肺結核"], ["tumor", "腫瘤"], ["turmoil", "騷動"],
+    ["twilight", "黃昏"], ["tyranny", "暴政"], ["ulcer", "潰瘍"], ["ultimate", "最終的"],
+    ["unanimous", "全體一致的"], ["uncover", "揭露"], ["underestimate", "低估"], ["undergo", "經歷"],
+    ["undermine", "破壞"], ["undertake", "承擔"], ["undo", "復原"], ["unemployment", "失業"],
+    ["unfold", "展開"], ["unify", "統一"], ["unlock", "開鎖"], ["unpack", "打開行李"],
+    ["upbringing", "養育"], ["upgrade", "升級"], ["uphold", "支持"], ["uranium", "鈾"],
+    ["urgency", "緊急"], ["urine", "尿液"], ["usher", "接待員"], ["utensil", "器皿"],
+    ["utility", "效用；公用事業"], ["utilize", "利用"], ["utmost", "極度的"], ["vaccine", "疫苗"],
+    ["valiant", "英勇的"], ["valid", "有效的"], ["validity", "有效性"], ["vanilla", "香草"],
+    ["variable", "變數；易變的"], ["variation", "變化"], ["vend", "販賣"], ["vendor", "小販"],
+    ["verge", "邊緣"], ["versatile", "多才多藝的"], ["version", "版本"], ["veteran", "老兵"],
+    ["veterinarian/vet", "獸醫"], ["vibration", "震動"], ["vice", "惡習；副的"], ["vicious", "邪惡的"],
+    ["victimize", "使受害"], ["victor", "勝利者"], ["victorious", "勝利的"], ["villa", "別墅"],
+    ["vineyard", "葡萄園"], ["virtual", "虛擬的"], ["visualize", "想像"], ["vitality", "活力"],
+    ["vocal", "聲音的"], ["vocation", "職業；天職"], ["vocational", "職業的"], ["vogue", "時尚"],
+    ["vomit", "嘔吐"], ["vulgar", "粗俗的"], ["vulnerable", "脆弱的"], ["wardrobe", "衣櫥"],
+    ["warfare", "戰爭"], ["warranty", "保固"], ["waterproof", "防水的"], ["whatsoever", "一點也(不)"],
+    ["windshield", "擋風玻璃"], ["withstand", "抵擋"], ["witty", "機智的"], ["woo", "求愛"],
+    ["wrench", "猛扭；扳手"], ["wrestle", "摔角"], ["Xerox", "影印"], ["yearn", "渴望"],
+    ["zeal", "熱誠"]
+   
+    ];
+
+// ==========================================
+// 常數與工具
+// ==========================================
+const LEVEL_META = {
+  1:{name:'基礎', color:'#27ae60'},
+  2:{name:'初級', color:'#8e44ad'},
+  3:{name:'中級', color:'#d35400'},
+  4:{name:'中高', color:'#c0392b'},
+  5:{name:'高級', color:'#28389e'},
+  6:{name:'終極', color:'#b8962e'},
+};
+const BUZZ_WINDOW = 8000;
+const ANSWER_WINDOW = 5000;
+const RESOLVE_DELAY = 1500;
+const BACKLASH_DMG = 8;
+const START_HP = 100;
+
+function getDataForLevel(n){
+  switch(n){
+    case 1: return dataLevel1;
+    case 2: return dataLevel2;
+    case 3: return dataLevel3;
+    case 4: return dataLevel4;
+    case 5: return dataLevel5;
+    case 6: return dataLevel6;
+    default: return [];
+  }
+}
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+function dmgForLevel(l){ return 6 + l*3; }
+function showScreen(id){
+  document.querySelectorAll('.app > div[id^="screen-"]').forEach(el=>el.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+// 依所選等級混合出一副牌，每題已預先算好選項，確保雙方（連線模式）看到一致內容
+function buildDeck(levels, totalRounds){
+  const pool = [];
+  levels.forEach(l=>{
+    getDataForLevel(l).forEach(([w,m])=> pool.push({w,m,l}));
+  });
+  shuffle(pool);
+  const n = Math.min(totalRounds, pool.length);
+  const chosen = pool.slice(0, n);
+  const deck = chosen.map(item=>{
+    let options = [item.m];
+    let guard = 0;
+    while(options.length < 5 && guard < 200){
+      guard++;
+      const rand = pool[Math.floor(Math.random()*pool.length)];
+      if(!options.includes(rand.m)) options.push(rand.m);
+    }
+    shuffle(options);
+    return { w:item.w, m:item.m, l:item.l, options };
+  });
+  return deck;
+}
+
+// ==========================================
+// 畫面：選單
+// ==========================================
+let pendingFlow = { mode:null }; // 'local' | 'online-host'
+let selectedLevels = new Set([1]);
+let selectedRoundCount = 12;
+
+document.getElementById('btn-mode-local').onclick = ()=>{
+  pendingFlow = { mode:'local' };
+  openLevelsScreen();
+};
+document.getElementById('btn-mode-online').onclick = ()=>{
+  document.getElementById('join-code-box').classList.add('hidden');
+  document.getElementById('join-error').textContent = '';
+  showScreen('screen-online-choice');
+};
+document.querySelectorAll('[data-back]').forEach(btn=>{
+  btn.onclick = ()=> showScreen(btn.getAttribute('data-back'));
+});
+document.getElementById('btn-create-room').onclick = ()=>{
+  pendingFlow = { mode:'online-host' };
+  openLevelsScreen();
+};
+document.getElementById('btn-join-room').onclick = ()=>{
+  document.getElementById('join-code-box').classList.remove('hidden');
+};
+
+function openLevelsScreen(){
+  renderLevelGrid();
+  renderRoundCountOptions();
+  document.getElementById('levels-back').onclick = ()=>{
+    showScreen(pendingFlow.mode === 'local' ? 'screen-menu' : 'screen-online-choice');
+  };
+  showScreen('screen-levels');
+}
+
+function renderLevelGrid(){
+  const grid = document.getElementById('level-grid');
+  grid.innerHTML = '';
+  for(let l=1;l<=6;l++){
+    const meta = LEVEL_META[l];
+    const chip = document.createElement('div');
+    chip.className = 'level-chip' + (selectedLevels.has(l) ? ' on' : '');
+    chip.innerHTML = `Lv.${l}<small>${meta.name}</small>`;
+    if(selectedLevels.has(l)){
+      chip.style.borderColor = meta.color;
+      chip.style.background = meta.color;
+      chip.style.boxShadow = '0 0 0 3px ' + meta.color + '55';
+    }
+    chip.onclick = ()=>{
+      if(selectedLevels.has(l)) selectedLevels.delete(l); else selectedLevels.add(l);
+      renderLevelGrid();
+      document.getElementById('btn-levels-continue').disabled = selectedLevels.size === 0;
+    };
+    grid.appendChild(chip);
+  }
+  document.getElementById('btn-levels-continue').disabled = selectedLevels.size === 0;
+}
+
+function renderRoundCountOptions(){
+  const box = document.getElementById('round-count-group');
+  box.style.display = 'flex';
+  box.style.flexWrap = 'wrap';
+  box.innerHTML = '';
+  [8,12,16,24].forEach(n=>{
+    const b = document.createElement('button');
+    b.className = 'btn small' + (n===selectedRoundCount ? ' primary' : '');
+    b.style.flex = '1 1 40%';
+    b.textContent = n + ' 題';
+    b.onclick = ()=>{ selectedRoundCount = n; renderRoundCountOptions(); };
+    box.appendChild(b);
+  });
+}
+
+document.getElementById('btn-levels-continue').onclick = ()=>{
+  const levels = Array.from(selectedLevels).sort();
+  if(pendingFlow.mode === 'local'){
+    startLocalGame(levels, selectedRoundCount);
+  } else if(pendingFlow.mode === 'online-host'){
+    createOnlineRoom(levels, selectedRoundCount);
+  }
+};
+
+// ==========================================
+// 本機雙人對戰
+// ==========================================
+let LG = null; // local game state
+let localBuzzTimer=null, localAnswerTimer=null, localTimerStart=0, localTimerDur=0, localTimerRAF=null;
+const LOCAL_DECIDE_WINDOW = 9000;
+
+function startLocalGame(levels, totalRounds){
+  const deck = buildDeck(levels, totalRounds);
+  LG = {
+    deck, idx:0,
+    hp:{p1:START_HP, p2:START_HP},
+    score:{p1:0, p2:0},
+  };
+  document.getElementById('p1-name').textContent = '玩家一 (A)';
+  document.getElementById('p2-name').textContent = '玩家二 (B)';
+  // 本機雙人對戰不需要搶答鍵，直接隱藏搶答列，改用選項對半按鈕搶答
+  document.getElementById('buzz-row').classList.add('hidden');
+
+  showScreen('screen-battle');
+  startLocalRound();
+}
+
+function localClearTimers(){
+  clearTimeout(localBuzzTimer); clearTimeout(localAnswerTimer);
+  if(localTimerRAF) cancelAnimationFrame(localTimerRAF);
+}
+
+function localRunTimerBar(durationMs, onExpire){
+  localTimerStart = performance.now();
+  localTimerDur = durationMs;
+  const fill = document.getElementById('round-timer-fill');
+  fill.style.background = 'var(--warn)';
+  function tick(){
+    const elapsed = performance.now() - localTimerStart;
+    const pct = Math.max(0, 100 - (elapsed/localTimerDur)*100);
+    fill.style.width = pct + '%';
+    if(elapsed >= localTimerDur){ onExpire(); return; }
+    localTimerRAF = requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function localRenderHpScore(){
+  document.getElementById('p1-hp').style.width = Math.max(0,LG.hp.p1) + '%';
+  document.getElementById('p2-hp').style.width = Math.max(0,LG.hp.p2) + '%';
+  document.getElementById('p1-score').textContent = LG.score.p1;
+  document.getElementById('p2-score').textContent = LG.score.p2;
+}
+
+function startLocalRound(){
+  if(LG.hp.p1 <= 0 || LG.hp.p2 <= 0 || LG.idx >= LG.deck.length){
+    return endLocalGame();
+  }
+  localClearTimers();
+  LG.buzzedBy = null;
+  const item = LG.deck[LG.idx];
+  const tag = document.getElementById('word-level-tag');
+  tag.textContent = 'Lv.' + item.l + ' ' + LEVEL_META[item.l].name;
+  tag.style.background = LEVEL_META[item.l].color;
+  document.getElementById('word-display').textContent = item.w;
+  document.getElementById('buzz-status').textContent = '看誰先按到正確答案！';
+  document.getElementById('buzz-status').className = 'buzz-status';
+
+  const opt = document.getElementById('options-container');
+  opt.innerHTML = '';
+  item.options.forEach(text=>{
+    const row = document.createElement('div');
+    row.className = 'option-btn split';
+    row.dataset.text = text;
+
+    const zoneA = document.createElement('button');
+    zoneA.className = 'zone a';
+    zoneA.innerHTML = '<span class="zone-tag">A</span>';
+    zoneA.onclick = ()=> localOnPick('p1', text, item.m);
+
+    const divider = document.createElement('div');
+    divider.className = 'divider';
+
+    const zoneB = document.createElement('button');
+    zoneB.className = 'zone b';
+    zoneB.innerHTML = '<span class="zone-tag">B</span>';
+    zoneB.onclick = ()=> localOnPick('p2', text, item.m);
+
+    const label = document.createElement('span');
+    label.className = 'option-label';
+    label.textContent = text;
+
+    row.appendChild(zoneA);
+    row.appendChild(divider);
+    row.appendChild(zoneB);
+    row.appendChild(label);
+    opt.appendChild(row);
+  });
+
+  localRenderHpScore();
+
+  localRunTimerBar(LOCAL_DECIDE_WINDOW, ()=>{
+    if(LG.buzzedBy) return;
+    LG.buzzedBy = 'none';
+    document.getElementById('buzz-status').textContent = '⌛ 誰都沒按到，跳過這題';
+    document.getElementById('buzz-status').className = 'buzz-status warn';
+    document.querySelectorAll('#options-container .zone').forEach(z=> z.disabled = true);
+    setTimeout(localAdvanceRound, RESOLVE_DELAY);
+  });
+}
+
+function localOnPick(side, chosen, correctText){
+  if(!LG || LG.buzzedBy) return;
+  LG.buzzedBy = side;
+  localClearTimers();
+  localResolve(chosen === correctText, chosen, correctText);
+}
+
+function localResolve(isCorrect, chosen, correctText){
+  const item = LG.deck[LG.idx];
+  correctText = correctText || item.m;
+  document.querySelectorAll('#options-container .option-btn').forEach(row=>{
+    row.querySelectorAll('.zone').forEach(z=> z.disabled = true);
+    if(row.dataset.text === correctText) row.classList.add('correct');
+    else if(row.dataset.text === chosen) row.classList.add('wrong');
+  });
+
+  const buzzer = LG.buzzedBy;
+  const other = buzzer === 'p1' ? 'p2' : 'p1';
+  const st = document.getElementById('buzz-status');
+  const buzzerLabel = buzzer === 'p1' ? '玩家一 (A)' : '玩家二 (B)';
+
+  if(isCorrect){
+    const dmg = dmgForLevel(item.l);
+    LG.hp[other] = Math.max(0, LG.hp[other] - dmg);
+    LG.score[buzzer]++;
+    st.textContent = `⚡ ${buzzerLabel} 答對！造成 ${dmg} 傷害 🔥`;
+    st.className = 'buzz-status ' + buzzer;
+  } else {
+    LG.hp[buzzer] = Math.max(0, LG.hp[buzzer] - BACKLASH_DMG);
+    st.textContent = `💢 ${buzzerLabel} 答錯了，反噬 ${BACKLASH_DMG} 傷害！`;
+    st.className = 'buzz-status warn';
+  }
+  localRenderHpScore();
+  setTimeout(localAdvanceRound, RESOLVE_DELAY);
+}
+
+function localAdvanceRound(){
+  LG.idx++;
+  if(LG.hp.p1 <= 0 || LG.hp.p2 <= 0 || LG.idx >= LG.deck.length){
+    endLocalGame();
+  } else {
+    startLocalRound();
+  }
+}
+
+function endLocalGame(){
+  localClearTimers();
+  let winner;
+  if(LG.hp.p1 <= 0 && LG.hp.p2 <= 0) winner = 'draw';
+  else if(LG.hp.p1 <= 0) winner = 'p2';
+  else if(LG.hp.p2 <= 0) winner = 'p1';
+  else if(LG.hp.p1 !== LG.hp.p2) winner = LG.hp.p1 > LG.hp.p2 ? 'p1' : 'p2';
+  else if(LG.score.p1 !== LG.score.p2) winner = LG.score.p1 > LG.score.p2 ? 'p1' : 'p2';
+  else winner = 'draw';
+
+  renderEndScreen(winner, '玩家一', '玩家二', LG.score.p1, LG.score.p2, LG.hp);
+}
+
+function renderEndScreen(winner, name1, name2, score1, score2, hp){
+  const title = document.getElementById('end-title');
+  const sub = document.getElementById('end-sub');
+  if(winner === 'draw'){
+    title.textContent = '🤝 平手！';
+    sub.textContent = '雙方勢均力敵';
+  } else {
+    const wName = winner === 'p1' ? name1 : name2;
+    title.textContent = '🏆 ' + wName + ' 獲勝！';
+    sub.textContent = 'HP 剩餘 ' + Math.max(0,hp.p1) + ' : ' + Math.max(0,hp.p2);
+  }
+  document.getElementById('end-p1-score').textContent = score1;
+  document.getElementById('end-p2-score').textContent = score2;
+  document.getElementById('end-p1-label').textContent = name1 + '得分';
+  document.getElementById('end-p2-label').textContent = name2 + '得分';
+  showScreen('screen-end');
+}
+
+document.getElementById('btn-play-again').onclick = ()=>{
+  if(ROOM_CODE){ showScreen('screen-menu'); ROOM_CODE=null; }
+  else showScreen('screen-menu');
+};
+document.getElementById('btn-back-menu').onclick = ()=> showScreen('screen-menu');
+
+// ==========================================
+// 連線對戰（房間代碼，透過共用儲存空間同步）
+// ==========================================
+let ROOM_CODE = null;
+let MY_ROLE = null; // 'p1' (房主) | 'p2' (加入者)
+let RG = null; // 快取的房間狀態
+let onlinePollHandle = null;
+let onlineTickHandle = null;
+
+function roomKey(code){ return 'duel:' + code; }
+
+async function readRoom(code){
+  try{
+    const r = await window.storage.get(roomKey(code), true);
+    return r ? JSON.parse(r.value) : null;
+  }catch(e){ return null; }
+}
+async function writeRoom(code, state){
+  try{
+    state.seq = (state.seq || 0) + 1;
+    await window.storage.set(roomKey(code), JSON.stringify(state), true);
+    return true;
+  }catch(e){ return false; }
+}
+
+function genRoomCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for(let i=0;i<5;i++) s += chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+
+async function createOnlineRoom(levels, totalRounds){
+  const deck = buildDeck(levels, totalRounds);
+  const code = genRoomCode();
+  const state = {
+    code, levels, totalRounds, deck,
+    guestJoined:false,
+    status:'waiting',
+    idx:0,
+    hp:{p1:START_HP,p2:START_HP},
+    score:{p1:0,p2:0},
+    round:null,
+    winner:null,
+    seq:0,
+  };
+  const ok = await writeRoom(code, state);
+  if(!ok){
+    alert('建立房間失敗，請確認網路連線後再試一次。');
+    return;
+  }
+  ROOM_CODE = code; MY_ROLE = 'p1'; RG = state;
+  document.getElementById('waiting-code').textContent = code;
+  showScreen('screen-waiting');
+  onlinePollHandle = setInterval(async ()=>{
+    const latest = await readRoom(code);
+    if(latest && latest.guestJoined && RG.status === 'waiting'){
+      clearInterval(onlinePollHandle);
+      latest.status = 'playing';
+      const started = { ...latest, round: makeFreshRound() };
+      await writeRoom(code, started);
+      RG = started;
+      enterOnlineBattle();
+    }
+  }, 1200);
+}
+
+document.getElementById('btn-cancel-room').onclick = async ()=>{
+  if(onlinePollHandle) clearInterval(onlinePollHandle);
+  if(ROOM_CODE){ try{ const cur = await readRoom(ROOM_CODE); if(cur){} }catch(e){} }
+  ROOM_CODE = null; RG = null; MY_ROLE = null;
+  showScreen('screen-menu');
+};
+
+document.getElementById('btn-join-confirm').onclick = async ()=>{
+  const codeInput = document.getElementById('join-code-input');
+  const code = codeInput.value.trim().toUpperCase();
+  const errBox = document.getElementById('join-error');
+  errBox.textContent = '';
+  if(!code){ errBox.textContent = '請輸入房間代碼'; return; }
+  const room = await readRoom(code);
+  if(!room){ errBox.textContent = '找不到這個房間，請確認代碼是否正確。'; return; }
+  if(room.guestJoined){ errBox.textContent = '這個房間已經有兩位玩家了。'; return; }
+  if(room.status !== 'waiting'){ errBox.textContent = '這場對戰已經開始或結束了。'; return; }
+
+  room.guestJoined = true;
+  const ok = await writeRoom(code, room);
+  if(!ok){ errBox.textContent = '加入失敗，請稍後再試。'; return; }
+
+  ROOM_CODE = code; MY_ROLE = 'p2'; RG = room;
+  errBox.style.color = 'var(--good)';
+  errBox.textContent = '已加入，等待房主開始對戰…';
+
+  onlinePollHandle = setInterval(async ()=>{
+    const latest = await readRoom(code);
+    if(latest && latest.status === 'playing'){
+      clearInterval(onlinePollHandle);
+      RG = latest;
+      enterOnlineBattle();
+    }
+  }, 1200);
+};
+
+function makeFreshRound(){
+  return { roundStartTs: Date.now(), buzzedBy:null, buzzTs:null, resolved:false, chosen:null, correctText:null, resultCorrect:null, expired:false };
+}
+
+function enterOnlineBattle(){
+  document.getElementById('p1-name').textContent = '房主';
+  document.getElementById('p2-name').textContent = '玩家二';
+  const buzzRow = document.getElementById('buzz-row');
+  buzzRow.classList.remove('hidden');
+  buzzRow.classList.add('single');
+  const mine = document.getElementById(MY_ROLE === 'p1' ? 'buzz-p1' : 'buzz-p2');
+  const theirs = document.getElementById(MY_ROLE === 'p1' ? 'buzz-p2' : 'buzz-p1');
+  theirs.classList.add('hidden');
+  mine.classList.remove('hidden');
+  mine.querySelector('.key-hint').textContent = '';
+  mine.onclick = onlineAttemptBuzz;
+  showScreen('screen-battle');
+
+  onlineRenderFromState();
+  onlineTickHandle = setInterval(onlineTick, 150);
+  onlinePollHandle = setInterval(onlineSync, 1100);
+}
+
+async function onlineSync(){
+  if(!ROOM_CODE) return;
+  const latest = await readRoom(ROOM_CODE);
+  if(!latest) return;
+  if(!RG || latest.seq !== RG.seq){
+    RG = latest;
+    onlineRenderFromState();
+  }
+  if(RG.status === 'finished'){
+    clearInterval(onlinePollHandle);
+    clearInterval(onlineTickHandle);
+    renderEndScreen(RG.winner, '房主', '玩家二', RG.score.p1, RG.score.p2, RG.hp);
+  }
+}
+
+let lastRenderedIdx = -1;
+function onlineRenderFromState(){
+  if(!RG || !RG.deck) return;
+  document.getElementById('p1-hp').style.width = Math.max(0,RG.hp.p1) + '%';
+  document.getElementById('p2-hp').style.width = Math.max(0,RG.hp.p2) + '%';
+  document.getElementById('p1-score').textContent = RG.score.p1;
+  document.getElementById('p2-score').textContent = RG.score.p2;
+
+  if(RG.idx >= RG.deck.length || !RG.round) return;
+  const item = RG.deck[RG.idx];
+  const tag = document.getElementById('word-level-tag');
+  tag.textContent = 'Lv.' + item.l + ' ' + LEVEL_META[item.l].name;
+  tag.style.background = LEVEL_META[item.l].color;
+  document.getElementById('word-display').textContent = item.w;
+
+  if(RG.idx !== lastRenderedIdx){
+    lastRenderedIdx = RG.idx;
+    const opt = document.getElementById('options-container');
+    opt.innerHTML = '';
+    item.options.forEach(text=>{
+      const b = document.createElement('button');
+      b.className = 'option-btn dim';
+      b.textContent = text;
+      b.disabled = true;
+      b.onclick = ()=> onlineSelectAnswer(text);
+      opt.appendChild(b);
+    });
+  }
+
+  const st = document.getElementById('buzz-status');
+  const r = RG.round;
+  const myBuzzBtn = document.getElementById(MY_ROLE === 'p1' ? 'buzz-p1' : 'buzz-p2');
+
+  if(r.resolved){
+    myBuzzBtn.disabled = true;
+    document.querySelectorAll('#options-container .option-btn').forEach(b=>{
+      b.disabled = true;
+      if(b.textContent === item.m) b.classList.add('correct');
+      else if(b.textContent === r.chosen) b.classList.add('wrong');
+    });
+    const buzzerLabel = r.buzzedBy === 'p1' ? '房主' : '玩家二';
+    if(r.resultCorrect){
+      st.textContent = '⚡ ' + buzzerLabel + ' 答對！造成傷害 🔥';
+      st.className = 'buzz-status ' + r.buzzedBy;
+    } else {
+      st.textContent = '💢 ' + buzzerLabel + ' 答錯，反噬傷害！';
+      st.className = 'buzz-status warn';
+    }
+  } else if(r.expired){
+    st.textContent = '⌛ 沒人搶到，跳過這題';
+    st.className = 'buzz-status warn';
+    myBuzzBtn.disabled = true;
+    document.querySelectorAll('#options-container .option-btn').forEach(b=> b.disabled = true);
+  } else if(r.buzzedBy){
+    const buzzerLabel = r.buzzedBy === 'p1' ? '房主' : '玩家二';
+    st.textContent = '⚡ ' + buzzerLabel + ' 搶到了！';
+    st.className = 'buzz-status ' + r.buzzedBy;
+    myBuzzBtn.disabled = true;
+    const isMe = r.buzzedBy === MY_ROLE;
+    document.querySelectorAll('#options-container .option-btn').forEach(b=>{
+      b.disabled = !isMe;
+      b.classList.toggle('dim', !isMe);
+    });
+  } else {
+    st.textContent = '';
+    myBuzzBtn.disabled = false;
+    document.querySelectorAll('#options-container .option-btn').forEach(b=>{
+      b.disabled = true; b.classList.add('dim'); b.classList.remove('correct','wrong');
+    });
+  }
+}
+
+function onlineTick(){
+  if(!RG || !RG.round) return;
+  const r = RG.round;
+  const fill = document.getElementById('round-timer-fill');
+  let elapsed, dur;
+  if(!r.buzzedBy && !r.resolved && !r.expired){
+    dur = BUZZ_WINDOW; elapsed = Date.now() - r.roundStartTs;
+  } else if(r.buzzedBy && !r.resolved && !r.expired){
+    dur = ANSWER_WINDOW; elapsed = Date.now() - r.buzzTs;
+  } else {
+    fill.style.width = '0%';
+    return;
+  }
+  const pct = Math.max(0, 100 - (elapsed/dur)*100);
+  fill.style.width = pct + '%';
+
+  if(elapsed >= dur){
+    if(!r.buzzedBy) onlineExpireRound();
+    else if(r.buzzedBy === MY_ROLE) onlineResolveRound(false, null);
+  }
+}
+
+async function onlineAttemptBuzz(){
+  if(!RG || !RG.round || RG.round.buzzedBy || RG.round.resolved || RG.round.expired) return;
+  const fresh = await readRoom(ROOM_CODE);
+  if(!fresh || fresh.idx !== RG.idx || !fresh.round || fresh.round.buzzedBy){
+    RG = fresh || RG; onlineRenderFromState();
+    return;
+  }
+  fresh.round.buzzedBy = MY_ROLE;
+  fresh.round.buzzTs = Date.now();
+  const ok = await writeRoom(ROOM_CODE, fresh);
+  if(ok){ RG = fresh; onlineRenderFromState(); }
+}
+
+async function onlineSelectAnswer(text){
+  if(!RG || !RG.round || RG.round.buzzedBy !== MY_ROLE || RG.round.resolved) return;
+  const item = RG.deck[RG.idx];
+  await onlineResolveRound(text === item.m, text);
+}
+
+async function onlineResolveRound(isCorrect, chosen){
+  const fresh = await readRoom(ROOM_CODE);
+  if(!fresh || fresh.idx !== RG.idx || !fresh.round || fresh.round.resolved || fresh.round.buzzedBy !== MY_ROLE) return;
+  const item = fresh.deck[fresh.idx];
+  const buzzer = MY_ROLE;
+  const other = buzzer === 'p1' ? 'p2' : 'p1';
+  if(isCorrect){
+    const dmg = dmgForLevel(item.l);
+    fresh.hp[other] = Math.max(0, fresh.hp[other] - dmg);
+    fresh.score[buzzer]++;
+  } else {
+    fresh.hp[buzzer] = Math.max(0, fresh.hp[buzzer] - BACKLASH_DMG);
+  }
+  fresh.round.resolved = true;
+  fresh.round.chosen = chosen;
+  fresh.round.resultCorrect = isCorrect;
+  const ok = await writeRoom(ROOM_CODE, fresh);
+  if(ok){ RG = fresh; onlineRenderFromState(); }
+  setTimeout(()=> onlineAdvanceIfMine(buzzer), RESOLVE_DELAY);
+}
+
+async function onlineExpireRound(){
+  const fresh = await readRoom(ROOM_CODE);
+  if(!fresh || fresh.idx !== RG.idx || !fresh.round || fresh.round.buzzedBy || fresh.round.expired) return;
+  fresh.round.expired = true;
+  const ok = await writeRoom(ROOM_CODE, fresh);
+  if(ok){ RG = fresh; onlineRenderFromState(); }
+  setTimeout(()=> onlineAdvanceIfMine('expire'), RESOLVE_DELAY);
+}
+
+async function onlineAdvanceIfMine(actor){
+  // 只有觸發本回合結果的那一端負責推進下一題，避免雙方重複寫入
+  const fresh = await readRoom(ROOM_CODE);
+  if(!fresh || fresh.idx !== RG.idx) return;
+  const nextIdx = fresh.idx + 1;
+  const over = fresh.hp.p1 <= 0 || fresh.hp.p2 <= 0 || nextIdx >= fresh.deck.length;
+  if(over){
+    let winner;
+    if(fresh.hp.p1 <= 0 && fresh.hp.p2 <= 0) winner = 'draw';
+    else if(fresh.hp.p1 <= 0) winner = 'p2';
+    else if(fresh.hp.p2 <= 0) winner = 'p1';
+    else if(fresh.hp.p1 !== fresh.hp.p2) winner = fresh.hp.p1 > fresh.hp.p2 ? 'p1' : 'p2';
+    else if(fresh.score.p1 !== fresh.score.p2) winner = fresh.score.p1 > fresh.score.p2 ? 'p1' : 'p2';
+    else winner = 'draw';
+    fresh.status = 'finished';
+    fresh.winner = winner;
+    await writeRoom(ROOM_CODE, fresh);
+  } else {
+    fresh.idx = nextIdx;
+    fresh.round = makeFreshRound();
+    await writeRoom(ROOM_CODE, fresh);
+  }
+  RG = fresh;
+  onlineRenderFromState();
+}
+
+// 離開結算畫面時清乾淨連線資源
+document.getElementById('btn-back-menu').addEventListener('click', ()=>{
+  if(onlinePollHandle) clearInterval(onlinePollHandle);
+  if(onlineTickHandle) clearInterval(onlineTickHandle);
+  ROOM_CODE = null; RG = null; MY_ROLE = null; lastRenderedIdx = -1;
+});
+</script>
+</body>
+</html>
