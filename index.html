@@ -187,6 +187,7 @@
   .option-btn.split .zone{
     flex:1; border:none; background:rgba(255,255,255,.02); cursor:pointer; padding:0;
     display:flex; align-items:flex-start; justify-content:flex-start; transition:background .12s ease;
+    touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent;
   }
   .option-btn.split .zone.a{ background:rgba(61,123,255,.08); justify-content:flex-start; }
   .option-btn.split .zone.b{ background:rgba(255,77,94,.08); justify-content:flex-end; }
@@ -2171,6 +2172,10 @@ function startLocalRound(){
     const zoneA = document.createElement('button');
     zoneA.className = 'zone a';
     zoneA.innerHTML = '<span class="zone-tag">A</span>';
+    // pointerdown 在手指一碰到螢幕就立刻觸發（不像 click 要等放開、還可能被瀏覽器
+    // 誤判成多指手勢而延遲），兩人同時搶按時能更準確抓到「誰真的先碰到」。
+    // click 保留作為鍵盤（Enter/Space）操作的備援，localOnPick 內建重複觸發防護，不會誤判。
+    zoneA.onpointerdown = ()=> localOnPick('p1', text, item.m);
     zoneA.onclick = ()=> localOnPick('p1', text, item.m);
 
     const divider = document.createElement('div');
@@ -2179,6 +2184,7 @@ function startLocalRound(){
     const zoneB = document.createElement('button');
     zoneB.className = 'zone b';
     zoneB.innerHTML = '<span class="zone-tag">B</span>';
+    zoneB.onpointerdown = ()=> localOnPick('p2', text, item.m);
     zoneB.onclick = ()=> localOnPick('p2', text, item.m);
 
     const label = document.createElement('span');
