@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>單字對決 Word Duel</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d0f14">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="單字對決">
 <style>
   :root{
     --bg:#0d0f14;
@@ -2040,7 +2048,17 @@ document.getElementById('btn-mode-local').onclick = ()=>{
   pendingFlow = { mode:'local' };
   openLevelsScreen();
 };
+// 連線對戰需要 Claude App 內建的雲端同步（window.storage），獨立安裝／自行架站的版本沒有這個 API，
+// 所以先偵測一下，沒有的話就提前告知使用者，而不是讓他點進去卡住看不懂為什麼建立不了房間。
+function onlineFeatureAvailable(){
+  return typeof window.storage !== 'undefined' && window.storage !== null;
+}
+
 document.getElementById('btn-mode-online').onclick = ()=>{
+  if(!onlineFeatureAvailable()){
+    alert('這個版本無法使用連線對戰喔！\n\n連線對戰需要 Claude App 內建的雲端同步功能，只有在 Claude 對話裡開啟這個遊戲時才能用。獨立安裝到手機的版本請改玩「本機雙人對戰」，兩人一樣可以同一台裝置面對面搶答～');
+    return;
+  }
   document.getElementById('join-code-box').classList.add('hidden');
   document.getElementById('join-error').textContent = '';
   showScreen('screen-online-choice');
@@ -2626,6 +2644,14 @@ document.getElementById('btn-back-menu').addEventListener('click', ()=>{
   if(onlineTickHandle) clearInterval(onlineTickHandle);
   ROOM_CODE = null; RG = null; MY_ROLE = null; lastRenderedIdx = -1;
 });
+
+// 註冊 Service Worker，讓安裝到手機主畫面後可離線遊玩（僅在真正用 http/https 架站開啟時才會生效，
+// 在 Claude App 內預覽或用 file:// 直接打開檔案時瀏覽器會自動略過，不影響正常遊玩）
+if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+  });
+}
 </script>
 </body>
 </html>

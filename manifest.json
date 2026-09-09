@@ -1,0 +1,18 @@
+{
+  "name": "單字對決 Word Duel",
+  "short_name": "單字對決",
+  "description": "依國高中七千單字六個等級分級的搶答對決遊戲，可本機雙人對戰或連線對戰",
+  "start_url": "./index.html",
+  "scope": "./",
+  "id": "/word-duel/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0d0f14",
+  "theme_color": "#0d0f14",
+  "lang": "zh-TW",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
