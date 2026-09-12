@@ -345,6 +345,8 @@
   <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極</div>
 </div>
 
+<!-- PeerJS：連線對戰用的 WebRTC 點對點直連函式庫 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
 <script>
 // ==========================================
 // 單字資料庫（依等級 1~6）[word, meaning]
@@ -1998,6 +2000,15 @@ function shuffle(arr){
 }
 function dmgForLevel(l){ return 6 + l*3; }
 
+function determineWinner(hp, score){
+  if(hp.p1 <= 0 && hp.p2 <= 0) return 'draw';
+  if(hp.p1 <= 0) return 'p2';
+  if(hp.p2 <= 0) return 'p1';
+  if(hp.p1 !== hp.p2) return hp.p1 > hp.p2 ? 'p1' : 'p2';
+  if(score.p1 !== score.p2) return score.p1 > score.p2 ? 'p1' : 'p2';
+  return 'draw';
+}
+
 // 依實際牌組（題數 × 該牌組平均傷害）動態計算雙方初始 HP，
 // 避免題數選很多、或選的等級偏高（單次傷害大）時，戰鬥還沒打到一半就分出勝負、
 // 剩下大半題目都用不到。
@@ -2048,15 +2059,15 @@ document.getElementById('btn-mode-local').onclick = ()=>{
   pendingFlow = { mode:'local' };
   openLevelsScreen();
 };
-// 連線對戰需要 Claude App 內建的雲端同步（window.storage），獨立安裝／自行架站的版本沒有這個 API，
-// 所以先偵測一下，沒有的話就提前告知使用者，而不是讓他點進去卡住看不懂為什麼建立不了房間。
+// 連線對戰改用 WebRTC 點對點直連（PeerJS），只要兩邊都有網路就能連，
+// 不再依賴 Claude App 內建的雲端同步，獨立安裝到手機的版本也能用。
 function onlineFeatureAvailable(){
-  return typeof window.storage !== 'undefined' && window.storage !== null;
+  return typeof Peer !== 'undefined';
 }
 
 document.getElementById('btn-mode-online').onclick = ()=>{
   if(!onlineFeatureAvailable()){
-    alert('這個版本無法使用連線對戰喔！\n\n連線對戰需要 Claude App 內建的雲端同步功能，只有在 Claude 對話裡開啟這個遊戲時才能用。獨立安裝到手機的版本請改玩「本機雙人對戰」，兩人一樣可以同一台裝置面對面搶答～');
+    alert('連線對戰的元件還沒載入完成，請確認網路連線正常後重新整理頁面再試一次。');
     return;
   }
   document.getElementById('join-code-box').classList.add('hidden');
@@ -2290,14 +2301,7 @@ function localAdvanceRound(){
 
 function endLocalGame(){
   localClearTimers();
-  let winner;
-  if(LG.hp.p1 <= 0 && LG.hp.p2 <= 0) winner = 'draw';
-  else if(LG.hp.p1 <= 0) winner = 'p2';
-  else if(LG.hp.p2 <= 0) winner = 'p1';
-  else if(LG.hp.p1 !== LG.hp.p2) winner = LG.hp.p1 > LG.hp.p2 ? 'p1' : 'p2';
-  else if(LG.score.p1 !== LG.score.p2) winner = LG.score.p1 > LG.score.p2 ? 'p1' : 'p2';
-  else winner = 'draw';
-
+  const winner = determineWinner(LG.hp, LG.score);
   renderEndScreen(winner, '玩家一', '玩家二', LG.score.p1, LG.score.p2, LG.hp, LG.maxHp);
 }
 
@@ -2327,29 +2331,20 @@ document.getElementById('btn-play-again').onclick = ()=>{
 document.getElementById('btn-back-menu').onclick = ()=> showScreen('screen-menu');
 
 // ==========================================
-// 連線對戰（房間代碼，透過共用儲存空間同步）
+// 連線對戰（WebRTC 點對點直連，透過 PeerJS）
+// 不需要申請任何帳號：兩邊瀏覽器直接連線傳資料，只借用 PeerJS 提供的
+// 公開「牽線」伺服器幫忙對上線（之後遊戲資料就直接兩機互傳）。
+// 房主＝連線中的權威端：所有計時、判定都由房主決定，玩家二只負責顯示畫面／送出操作意圖，
+// 這樣才不會發生兩邊各自判定、互相衝突的問題。
 // ==========================================
 let ROOM_CODE = null;
-let MY_ROLE = null; // 'p1' (房主) | 'p2' (加入者)
-let RG = null; // 快取的房間狀態
-let onlinePollHandle = null;
+let MY_ROLE = null;      // 'p1' (房主) | 'p2' (加入者)
+let peer = null;         // 這台裝置的 PeerJS 物件
+let conn = null;         // 與對方的直連通道
+let ONLINE = null;       // 這台裝置看到的對戰狀態（房主是權威版本，玩家二是鏡射）
+let hostBuzzTimeout = null, hostAnswerTimeout = null;
 let onlineTickHandle = null;
-
-function roomKey(code){ return 'duel:' + code; }
-
-async function readRoom(code){
-  try{
-    const r = await window.storage.get(roomKey(code), true);
-    return r ? JSON.parse(r.value) : null;
-  }catch(e){ return null; }
-}
-async function writeRoom(code, state){
-  try{
-    state.seq = (state.seq || 0) + 1;
-    await window.storage.set(roomKey(code), JSON.stringify(state), true);
-    return true;
-  }catch(e){ return false; }
-}
+let lastRenderedIdx = -1;
 
 function genRoomCode(){
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -2357,83 +2352,225 @@ function genRoomCode(){
   for(let i=0;i<5;i++) s += chars[Math.floor(Math.random()*chars.length)];
   return s;
 }
+function peerIdFor(code){ return 'wordduel-' + code; }
+function sendToPeer(msg){ if(conn && conn.open) conn.send(msg); }
+function msgOf(type, payload){ return Object.assign({type}, payload || {}); }
 
-async function createOnlineRoom(levels, totalRounds){
+function cleanupOnline(){
+  clearTimeout(hostBuzzTimeout); clearTimeout(hostAnswerTimeout);
+  if(onlineTickHandle) clearInterval(onlineTickHandle);
+  if(conn){ try{ conn.close(); }catch(e){} }
+  if(peer){ try{ peer.destroy(); }catch(e){} }
+  conn = null; peer = null; ROOM_CODE = null; MY_ROLE = null; ONLINE = null; lastRenderedIdx = -1;
+}
+
+function handlePeerDisconnect(){
+  if(document.getElementById('screen-battle').classList.contains('hidden')) return; // 已經離開對戰畫面就不用再提示
+  alert('對手已離線，連線中斷了。');
+  cleanupOnline();
+  showScreen('screen-menu');
+}
+
+// ---------- 房主（建立房間）----------
+function createOnlineRoom(levels, totalRounds){
   const deck = buildDeck(levels, totalRounds);
   const hp0 = computeStartHP(deck);
   const code = genRoomCode();
-  const state = {
-    code, levels, totalRounds, deck,
-    guestJoined:false,
-    status:'waiting',
-    idx:0, maxHp:hp0,
-    hp:{p1:hp0,p2:hp0},
-    score:{p1:0,p2:0},
-    round:null,
-    winner:null,
-    seq:0,
-  };
-  const ok = await writeRoom(code, state);
-  if(!ok){
-    alert('建立房間失敗，請確認網路連線後再試一次。');
-    return;
-  }
-  ROOM_CODE = code; MY_ROLE = 'p1'; RG = state;
+  MY_ROLE = 'p1';
+  ROOM_CODE = code;
+  ONLINE = { deck, maxHp:hp0, totalRounds, idx:0, hp:{p1:hp0,p2:hp0}, score:{p1:0,p2:0}, round:null };
+
   document.getElementById('waiting-code').textContent = code;
   showScreen('screen-waiting');
-  onlinePollHandle = setInterval(async ()=>{
-    const latest = await readRoom(code);
-    if(latest && latest.guestJoined && RG.status === 'waiting'){
-      clearInterval(onlinePollHandle);
-      latest.status = 'playing';
-      const started = { ...latest, round: makeFreshRound() };
-      await writeRoom(code, started);
-      RG = started;
+
+  peer = new Peer(peerIdFor(code));
+  peer.on('connection', (c)=>{
+    conn = c;
+    conn.on('open', ()=>{
+      sendToPeer(msgOf('init', { deck: ONLINE.deck, maxHp: ONLINE.maxHp, totalRounds: ONLINE.totalRounds }));
       enterOnlineBattle();
+      hostStartRound();
+    });
+    conn.on('data', hostHandleMessage);
+    conn.on('close', handlePeerDisconnect);
+  });
+  peer.on('error', (err)=>{
+    if(err && err.type === 'unavailable-id'){
+      try{ peer.destroy(); }catch(e){}
+      createOnlineRoom(levels, totalRounds); // 房號極少數衝突，換一組重試
+    } else {
+      alert('建立房間時發生連線問題，請確認網路後再試一次。');
+      cleanupOnline();
+      showScreen('screen-menu');
     }
-  }, 1200);
+  });
 }
 
-document.getElementById('btn-cancel-room').onclick = async ()=>{
-  if(onlinePollHandle) clearInterval(onlinePollHandle);
-  if(ROOM_CODE){ try{ const cur = await readRoom(ROOM_CODE); if(cur){} }catch(e){} }
-  ROOM_CODE = null; RG = null; MY_ROLE = null;
+document.getElementById('btn-cancel-room').onclick = ()=>{
+  cleanupOnline();
   showScreen('screen-menu');
 };
 
-document.getElementById('btn-join-confirm').onclick = async ()=>{
+// ---------- 玩家二（輸入代碼加入）----------
+document.getElementById('btn-join-confirm').onclick = ()=>{
   const codeInput = document.getElementById('join-code-input');
   const code = codeInput.value.trim().toUpperCase();
   const errBox = document.getElementById('join-error');
+  errBox.style.color = '';
   errBox.textContent = '';
   if(!code){ errBox.textContent = '請輸入房間代碼'; return; }
-  const room = await readRoom(code);
-  if(!room){ errBox.textContent = '找不到這個房間，請確認代碼是否正確。'; return; }
-  if(room.guestJoined){ errBox.textContent = '這個房間已經有兩位玩家了。'; return; }
-  if(room.status !== 'waiting'){ errBox.textContent = '這場對戰已經開始或結束了。'; return; }
 
-  room.guestJoined = true;
-  const ok = await writeRoom(code, room);
-  if(!ok){ errBox.textContent = '加入失敗，請稍後再試。'; return; }
+  MY_ROLE = 'p2';
+  ROOM_CODE = code;
+  errBox.textContent = '連線中…';
 
-  ROOM_CODE = code; MY_ROLE = 'p2'; RG = room;
-  errBox.style.color = 'var(--good)';
-  errBox.textContent = '已加入，等待房主開始對戰…';
-
-  onlinePollHandle = setInterval(async ()=>{
-    const latest = await readRoom(code);
-    if(latest && latest.status === 'playing'){
-      clearInterval(onlinePollHandle);
-      RG = latest;
-      enterOnlineBattle();
+  peer = new Peer();
+  peer.on('open', ()=>{
+    conn = peer.connect(peerIdFor(code), { reliable:true });
+    conn.on('open', ()=>{
+      errBox.style.color = 'var(--good)';
+      errBox.textContent = '已連線，等待房主開始對戰…';
+    });
+    conn.on('data', guestHandleMessage);
+    conn.on('close', handlePeerDisconnect);
+    conn.on('error', ()=>{ errBox.style.color=''; errBox.textContent = '找不到這個房間，請確認代碼是否正確。'; });
+  });
+  peer.on('error', (err)=>{
+    if(err && err.type === 'peer-unavailable'){
+      errBox.style.color = '';
+      errBox.textContent = '找不到這個房間，請確認代碼是否正確。';
+    } else {
+      errBox.style.color = '';
+      errBox.textContent = '連線發生問題，請確認網路後再試一次。';
     }
-  }, 1200);
+  });
 };
 
-function makeFreshRound(){
-  return { roundStartTs: Date.now(), buzzedBy:null, buzzTs:null, resolved:false, chosen:null, correctText:null, resultCorrect:null, expired:false };
+function guestHandleMessage(msg){
+  switch(msg.type){
+    case 'init':
+      ONLINE = { deck: msg.deck, maxHp: msg.maxHp, totalRounds: msg.totalRounds, idx:0,
+                 hp:{p1:msg.maxHp, p2:msg.maxHp}, score:{p1:0,p2:0}, round:null };
+      enterOnlineBattle();
+      break;
+    case 'round-start':
+      lastRenderedIdx = -1;
+      ONLINE.idx = msg.idx;
+      ONLINE.round = { roundStartTs: msg.ts, buzzedBy:null, buzzTs:null, resolved:false, chosen:null, correctness:null, expired:false };
+      onlineRenderFromState();
+      break;
+    case 'buzz-result':
+      ONLINE.round.buzzedBy = msg.by;
+      ONLINE.round.buzzTs = msg.ts;
+      onlineRenderFromState();
+      break;
+    case 'answer-result':
+      ONLINE.round.resolved = true;
+      ONLINE.round.chosen = msg.chosen;
+      ONLINE.round.correctness = msg.correct;
+      ONLINE.hp = msg.hp; ONLINE.score = msg.score;
+      onlineRenderFromState();
+      break;
+    case 'round-timeout':
+      ONLINE.round.expired = true;
+      onlineRenderFromState();
+      break;
+    case 'game-over':
+      ONLINE.hp = msg.hp; ONLINE.score = msg.score;
+      { const maxHp = ONLINE.maxHp; cleanupOnline();
+        renderEndScreen(msg.winner, '房主', '玩家二', msg.score.p1, msg.score.p2, msg.hp, maxHp); }
+      break;
+  }
 }
 
+// 玩家二送出搶答意圖 / 答案，交給房主判定
+function guestSendBuzz(){
+  if(!ONLINE || !ONLINE.round || ONLINE.round.buzzedBy || ONLINE.round.resolved || ONLINE.round.expired) return;
+  sendToPeer(msgOf('buzz-attempt'));
+}
+function guestSendAnswer(text){
+  if(!ONLINE || !ONLINE.round || ONLINE.round.buzzedBy !== 'p2' || ONLINE.round.resolved) return;
+  sendToPeer(msgOf('answer', { text }));
+}
+
+// ---------- 房主端：權威判定邏輯 ----------
+function hostHandleMessage(msg){
+  if(msg.type === 'buzz-attempt') hostTryBuzz('p2');
+  else if(msg.type === 'answer') hostTryAnswer('p2', msg.text);
+}
+
+function hostStartRound(){
+  if(ONLINE.hp.p1 <= 0 || ONLINE.hp.p2 <= 0 || ONLINE.idx >= ONLINE.deck.length){ return hostEndGame(); }
+  clearTimeout(hostBuzzTimeout); clearTimeout(hostAnswerTimeout);
+  lastRenderedIdx = -1;
+  ONLINE.round = { roundStartTs: Date.now(), buzzedBy:null, buzzTs:null, resolved:false, chosen:null, correctness:null, expired:false };
+  sendToPeer(msgOf('round-start', { idx: ONLINE.idx, ts: ONLINE.round.roundStartTs }));
+  onlineRenderFromState();
+  hostBuzzTimeout = setTimeout(()=>{
+    if(ONLINE.round.buzzedBy) return;
+    ONLINE.round.expired = true;
+    sendToPeer(msgOf('round-timeout'));
+    onlineRenderFromState();
+    setTimeout(hostAdvanceRound, RESOLVE_DELAY);
+  }, BUZZ_WINDOW);
+}
+
+function hostTryBuzz(role){
+  if(!ONLINE.round || ONLINE.round.buzzedBy || ONLINE.round.resolved || ONLINE.round.expired) return;
+  clearTimeout(hostBuzzTimeout);
+  ONLINE.round.buzzedBy = role;
+  ONLINE.round.buzzTs = Date.now();
+  sendToPeer(msgOf('buzz-result', { by: role, ts: ONLINE.round.buzzTs }));
+  onlineRenderFromState();
+  hostAnswerTimeout = setTimeout(()=>{
+    if(ONLINE.round.resolved) return;
+    hostResolveRound(role, false, null);
+  }, ANSWER_WINDOW);
+}
+
+function hostTryAnswer(role, text){
+  if(!ONLINE.round || ONLINE.round.buzzedBy !== role || ONLINE.round.resolved) return;
+  clearTimeout(hostAnswerTimeout);
+  const item = ONLINE.deck[ONLINE.idx];
+  hostResolveRound(role, text === item.m, text);
+}
+
+function hostResolveRound(buzzer, isCorrect, chosen){
+  const item = ONLINE.deck[ONLINE.idx];
+  const other = buzzer === 'p1' ? 'p2' : 'p1';
+  if(isCorrect){
+    const dmg = dmgForLevel(item.l);
+    ONLINE.hp[other] = Math.max(0, ONLINE.hp[other] - dmg);
+    ONLINE.score[buzzer]++;
+  } else {
+    ONLINE.hp[buzzer] = Math.max(0, ONLINE.hp[buzzer] - BACKLASH_DMG);
+  }
+  ONLINE.round.resolved = true;
+  ONLINE.round.chosen = chosen;
+  ONLINE.round.correctness = isCorrect;
+  sendToPeer(msgOf('answer-result', { chosen, correct:isCorrect, hp:ONLINE.hp, score:ONLINE.score }));
+  onlineRenderFromState();
+  setTimeout(hostAdvanceRound, RESOLVE_DELAY);
+}
+
+function hostAdvanceRound(){
+  ONLINE.idx++;
+  if(ONLINE.hp.p1 <= 0 || ONLINE.hp.p2 <= 0 || ONLINE.idx >= ONLINE.deck.length){
+    hostEndGame();
+  } else {
+    hostStartRound();
+  }
+}
+
+function hostEndGame(){
+  const winner = determineWinner(ONLINE.hp, ONLINE.score);
+  sendToPeer(msgOf('game-over', { winner, hp: ONLINE.hp, score: ONLINE.score }));
+  const maxHp = ONLINE.maxHp, score = ONLINE.score, hp = ONLINE.hp;
+  cleanupOnline();
+  renderEndScreen(winner, '房主', '玩家二', score.p1, score.p2, hp, maxHp);
+}
+
+// ---------- 共用：畫面渲染 ----------
 function enterOnlineBattle(){
   document.getElementById('p1-name').textContent = '房主';
   document.getElementById('p2-name').textContent = '玩家二';
@@ -2445,47 +2582,32 @@ function enterOnlineBattle(){
   theirs.classList.add('hidden');
   mine.classList.remove('hidden');
   mine.querySelector('.key-hint').textContent = '';
-  mine.onclick = onlineAttemptBuzz;
+  const attemptBuzz = ()=>{ if(MY_ROLE === 'p1') hostTryBuzz('p1'); else guestSendBuzz(); };
+  mine.onpointerdown = attemptBuzz;
+  mine.onclick = attemptBuzz;
   showScreen('screen-battle');
 
   onlineRenderFromState();
   onlineTickHandle = setInterval(onlineTick, 150);
-  onlinePollHandle = setInterval(onlineSync, 1100);
 }
 
-async function onlineSync(){
-  if(!ROOM_CODE) return;
-  const latest = await readRoom(ROOM_CODE);
-  if(!latest) return;
-  if(!RG || latest.seq !== RG.seq){
-    RG = latest;
-    onlineRenderFromState();
-  }
-  if(RG.status === 'finished'){
-    clearInterval(onlinePollHandle);
-    clearInterval(onlineTickHandle);
-    renderEndScreen(RG.winner, '房主', '玩家二', RG.score.p1, RG.score.p2, RG.hp, RG.maxHp);
-  }
-}
-
-let lastRenderedIdx = -1;
 function onlineRenderFromState(){
-  if(!RG || !RG.deck) return;
-  const maxHp = RG.maxHp || 100;
-  document.getElementById('p1-hp').style.width = Math.max(0, RG.hp.p1/maxHp*100) + '%';
-  document.getElementById('p2-hp').style.width = Math.max(0, RG.hp.p2/maxHp*100) + '%';
-  document.getElementById('p1-score').textContent = RG.score.p1;
-  document.getElementById('p2-score').textContent = RG.score.p2;
+  if(!ONLINE || !ONLINE.deck) return;
+  const maxHp = ONLINE.maxHp || 100;
+  document.getElementById('p1-hp').style.width = Math.max(0, ONLINE.hp.p1/maxHp*100) + '%';
+  document.getElementById('p2-hp').style.width = Math.max(0, ONLINE.hp.p2/maxHp*100) + '%';
+  document.getElementById('p1-score').textContent = ONLINE.score.p1;
+  document.getElementById('p2-score').textContent = ONLINE.score.p2;
 
-  if(RG.idx >= RG.deck.length || !RG.round) return;
-  const item = RG.deck[RG.idx];
+  if(ONLINE.idx >= ONLINE.deck.length || !ONLINE.round) return;
+  const item = ONLINE.deck[ONLINE.idx];
   const tag = document.getElementById('word-level-tag');
   tag.textContent = 'Lv.' + item.l + ' ' + LEVEL_META[item.l].name;
   tag.style.background = LEVEL_META[item.l].color;
   document.getElementById('word-display').textContent = item.w;
 
-  if(RG.idx !== lastRenderedIdx){
-    lastRenderedIdx = RG.idx;
+  if(ONLINE.idx !== lastRenderedIdx){
+    lastRenderedIdx = ONLINE.idx;
     const opt = document.getElementById('options-container');
     opt.innerHTML = '';
     item.options.forEach(text=>{
@@ -2493,13 +2615,18 @@ function onlineRenderFromState(){
       b.className = 'option-btn dim';
       b.textContent = text;
       b.disabled = true;
-      b.onclick = ()=> onlineSelectAnswer(text);
+      const submit = ()=>{
+        if(MY_ROLE === 'p1') hostTryAnswer('p1', text);
+        else guestSendAnswer(text);
+      };
+      b.onpointerdown = submit;
+      b.onclick = submit;
       opt.appendChild(b);
     });
   }
 
   const st = document.getElementById('buzz-status');
-  const r = RG.round;
+  const r = ONLINE.round;
   const myBuzzBtn = document.getElementById(MY_ROLE === 'p1' ? 'buzz-p1' : 'buzz-p2');
 
   if(r.resolved){
@@ -2510,7 +2637,7 @@ function onlineRenderFromState(){
       else if(b.textContent === r.chosen) b.classList.add('wrong');
     });
     const buzzerLabel = r.buzzedBy === 'p1' ? '房主' : '玩家二';
-    if(r.resultCorrect){
+    if(r.correctness){
       st.textContent = '⚡ ' + buzzerLabel + ' 答對！造成傷害 🔥';
       st.className = 'buzz-status ' + r.buzzedBy;
     } else {
@@ -2541,9 +2668,11 @@ function onlineRenderFromState(){
   }
 }
 
+// 純畫面用的讀秒動畫；實際逾時判定一律由房主的 setTimeout 負責，這裡不做任何狀態變更，
+// 避免雙方各自判斷逾時而衝突。
 function onlineTick(){
-  if(!RG || !RG.round) return;
-  const r = RG.round;
+  if(!ONLINE || !ONLINE.round) return;
+  const r = ONLINE.round;
   const fill = document.getElementById('round-timer-fill');
   let elapsed, dur;
   if(!r.buzzedBy && !r.resolved && !r.expired){
@@ -2556,94 +2685,10 @@ function onlineTick(){
   }
   const pct = Math.max(0, 100 - (elapsed/dur)*100);
   fill.style.width = pct + '%';
-
-  if(elapsed >= dur){
-    if(!r.buzzedBy) onlineExpireRound();
-    else if(r.buzzedBy === MY_ROLE) onlineResolveRound(false, null);
-  }
-}
-
-async function onlineAttemptBuzz(){
-  if(!RG || !RG.round || RG.round.buzzedBy || RG.round.resolved || RG.round.expired) return;
-  const fresh = await readRoom(ROOM_CODE);
-  if(!fresh || fresh.idx !== RG.idx || !fresh.round || fresh.round.buzzedBy){
-    RG = fresh || RG; onlineRenderFromState();
-    return;
-  }
-  fresh.round.buzzedBy = MY_ROLE;
-  fresh.round.buzzTs = Date.now();
-  const ok = await writeRoom(ROOM_CODE, fresh);
-  if(ok){ RG = fresh; onlineRenderFromState(); }
-}
-
-async function onlineSelectAnswer(text){
-  if(!RG || !RG.round || RG.round.buzzedBy !== MY_ROLE || RG.round.resolved) return;
-  const item = RG.deck[RG.idx];
-  await onlineResolveRound(text === item.m, text);
-}
-
-async function onlineResolveRound(isCorrect, chosen){
-  const fresh = await readRoom(ROOM_CODE);
-  if(!fresh || fresh.idx !== RG.idx || !fresh.round || fresh.round.resolved || fresh.round.buzzedBy !== MY_ROLE) return;
-  const item = fresh.deck[fresh.idx];
-  const buzzer = MY_ROLE;
-  const other = buzzer === 'p1' ? 'p2' : 'p1';
-  if(isCorrect){
-    const dmg = dmgForLevel(item.l);
-    fresh.hp[other] = Math.max(0, fresh.hp[other] - dmg);
-    fresh.score[buzzer]++;
-  } else {
-    fresh.hp[buzzer] = Math.max(0, fresh.hp[buzzer] - BACKLASH_DMG);
-  }
-  fresh.round.resolved = true;
-  fresh.round.chosen = chosen;
-  fresh.round.resultCorrect = isCorrect;
-  const ok = await writeRoom(ROOM_CODE, fresh);
-  if(ok){ RG = fresh; onlineRenderFromState(); }
-  setTimeout(()=> onlineAdvanceIfMine(buzzer), RESOLVE_DELAY);
-}
-
-async function onlineExpireRound(){
-  const fresh = await readRoom(ROOM_CODE);
-  if(!fresh || fresh.idx !== RG.idx || !fresh.round || fresh.round.buzzedBy || fresh.round.expired) return;
-  fresh.round.expired = true;
-  const ok = await writeRoom(ROOM_CODE, fresh);
-  if(ok){ RG = fresh; onlineRenderFromState(); }
-  setTimeout(()=> onlineAdvanceIfMine('expire'), RESOLVE_DELAY);
-}
-
-async function onlineAdvanceIfMine(actor){
-  // 只有觸發本回合結果的那一端負責推進下一題，避免雙方重複寫入
-  const fresh = await readRoom(ROOM_CODE);
-  if(!fresh || fresh.idx !== RG.idx) return;
-  const nextIdx = fresh.idx + 1;
-  const over = fresh.hp.p1 <= 0 || fresh.hp.p2 <= 0 || nextIdx >= fresh.deck.length;
-  if(over){
-    let winner;
-    if(fresh.hp.p1 <= 0 && fresh.hp.p2 <= 0) winner = 'draw';
-    else if(fresh.hp.p1 <= 0) winner = 'p2';
-    else if(fresh.hp.p2 <= 0) winner = 'p1';
-    else if(fresh.hp.p1 !== fresh.hp.p2) winner = fresh.hp.p1 > fresh.hp.p2 ? 'p1' : 'p2';
-    else if(fresh.score.p1 !== fresh.score.p2) winner = fresh.score.p1 > fresh.score.p2 ? 'p1' : 'p2';
-    else winner = 'draw';
-    fresh.status = 'finished';
-    fresh.winner = winner;
-    await writeRoom(ROOM_CODE, fresh);
-  } else {
-    fresh.idx = nextIdx;
-    fresh.round = makeFreshRound();
-    await writeRoom(ROOM_CODE, fresh);
-  }
-  RG = fresh;
-  onlineRenderFromState();
 }
 
 // 離開結算畫面時清乾淨連線資源
-document.getElementById('btn-back-menu').addEventListener('click', ()=>{
-  if(onlinePollHandle) clearInterval(onlinePollHandle);
-  if(onlineTickHandle) clearInterval(onlineTickHandle);
-  ROOM_CODE = null; RG = null; MY_ROLE = null; lastRenderedIdx = -1;
-});
+document.getElementById('btn-back-menu').addEventListener('click', cleanupOnline);
 
 // 註冊 Service Worker，讓安裝到手機主畫面後可離線遊玩（僅在真正用 http/https 架站開啟時才會生效，
 // 在 Claude App 內預覽或用 file:// 直接打開檔案時瀏覽器會自動略過，不影響正常遊玩）
