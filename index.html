@@ -277,7 +277,10 @@
     <h1 class="brand">等待對手加入…</h1>
     <div class="card" style="text-align:center;">
       <div class="hint">把這組代碼給你的對手輸入</div>
-      <div class="room-code-display" id="waiting-code">------</div>
+      <div style="display:flex; align-items:center; justify-content:center; gap:10px; margin:18px 0 6px;">
+        <div class="room-code-display" id="waiting-code" style="margin:0;">------</div>
+        <button class="btn small" id="btn-copy-code" style="width:auto; padding:10px 14px; flex-shrink:0;" title="複製代碼">📋 複製</button>
+      </div>
       <div class="hint"><span class="pulse-dot"></span>連線中，等待玩家二加入</div>
       <button class="btn ghost ansi" style="border:1px solid var(--line); margin-top:16px;" id="btn-cancel-room">取消房間</button>
     </div>
@@ -322,7 +325,7 @@
     </div>
   </div>
 
-  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-12-04（搶答鍵已徹底刪除；如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
+  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-12-07（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
 </div>
 
 <!-- PeerJS：連線對戰用的 WebRTC 點對點直連函式庫 -->
@@ -2005,21 +2008,73 @@ function showScreen(id){
   document.getElementById(id).classList.remove('hidden');
 }
 
-// 依所選等級混合出一副牌，每題已預先算好選項，確保雙方（連線模式）看到一致內容
-function buildDeck(levels, totalRounds){
-  const pool = [];
-  levels.forEach(l=>{
-    getDataForLevel(l).forEach(([w,m])=> pool.push({w,m,l}));
+// ==========================================
+// 封鎖右鍵選單與常見的開發者工具快捷鍵（F12、Ctrl+Shift+I/J/C、Ctrl+U）。
+// 提醒：這只能擋掉「隨手」想看原始碼的人，擋不住真的想拆解網頁的人
+// （瀏覽器選單一樣能開發者工具、也能直接讀取下載下來的檔案），純粹是降低隨手複製的方便度。
+// ==========================================
+document.addEventListener('contextmenu', (e)=> e.preventDefault());
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'F12'){ e.preventDefault(); return; }
+  if(e.ctrlKey && e.shiftKey && ['I','J','C','i','j','c'].includes(e.key)){ e.preventDefault(); return; }
+  if(e.ctrlKey && (e.key === 'u' || e.key === 'U')){ e.preventDefault(); return; }
+});
+
+// 房主一鍵複製房間代碼
+document.getElementById('btn-copy-code').onclick = async ()=>{
+  const btn = document.getElementById('btn-copy-code');
+  const code = ROOM_CODE_TEXT_FOR_COPY();
+  let copied = false;
+  try{
+    await navigator.clipboard.writeText(code);
+    copied = true;
+  }catch(e){
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = code;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      copied = document.execCommand('copy');
+      document.body.removeChild(ta);
+    }catch(e2){ copied = false; }
+  }
+  const original = btn.textContent;
+  btn.textContent = copied ? '✅ 已複製' : '❌ 複製失敗';
+  setTimeout(()=>{ btn.textContent = original; }, 1500);
+};
+function ROOM_CODE_TEXT_FOR_COPY(){
+  return (typeof ROOM_CODE !== 'undefined' && ROOM_CODE) ? ROOM_CODE : document.getElementById('waiting-code').textContent;
+}
+
+// 依「每個等級各自要出幾題」組成一副牌：levelCounts 例如 {1:8} 或 {1:5, 3:10}。
+// 每個等級各自從該等級的單字池抽出指定數量，再整體洗牌交錯；每題已預先算好選項，
+// 確保雙方（連線模式）看到一致內容。干擾選項則從「所有有牌的等級」混合抽取。
+function buildDeck(levelCounts){
+  const distractorPool = [];
+  let combined = [];
+
+  Object.keys(levelCounts).forEach(lvlStr=>{
+    const l = Number(lvlStr);
+    const words = getDataForLevel(l).map(([w,m])=> ({w,m,l}));
+    words.forEach(item=> distractorPool.push(item));
+
+    const count = levelCounts[lvlStr];
+    if(!count || count <= 0) return;
+    const pool = words.slice();
+    shuffle(pool);
+    combined = combined.concat(pool.slice(0, Math.min(count, pool.length)));
   });
-  shuffle(pool);
-  const n = Math.min(totalRounds, pool.length);
-  const chosen = pool.slice(0, n);
-  const deck = chosen.map(item=>{
+
+  shuffle(combined);
+
+  const deck = combined.map(item=>{
     let options = [item.m];
     let guard = 0;
     while(options.length < 5 && guard < 200){
       guard++;
-      const rand = pool[Math.floor(Math.random()*pool.length)];
+      const rand = distractorPool[Math.floor(Math.random()*distractorPool.length)];
       if(!options.includes(rand.m)) options.push(rand.m);
     }
     shuffle(options);
@@ -2033,7 +2088,9 @@ function buildDeck(levels, totalRounds){
 // ==========================================
 let pendingFlow = { mode:null }; // 'local' | 'online-host'
 let selectedLevels = new Set([1]);
-let selectedRoundCount = 12;
+let singleRoundCount = 12;     // 只選 1 個等級時使用
+let customRoundActive = false; // 是否正在用「自訂題數」而不是預設按鈕
+let perLevelCounts = {};       // 選 2 個等級以上時，每個等級各自的題數 { level: count }
 
 document.getElementById('btn-mode-local').onclick = ()=>{
   pendingFlow = { mode:'local' };
@@ -2067,7 +2124,8 @@ document.getElementById('btn-join-room').onclick = ()=>{
 
 function openLevelsScreen(){
   renderLevelGrid();
-  renderRoundCountOptions();
+  syncPerLevelCounts();
+  renderRoundCountArea();
   document.getElementById('levels-back').onclick = ()=>{
     showScreen(pendingFlow.mode === 'local' ? 'screen-menu' : 'screen-online-choice');
   };
@@ -2090,34 +2148,143 @@ function renderLevelGrid(){
     chip.onclick = ()=>{
       if(selectedLevels.has(l)) selectedLevels.delete(l); else selectedLevels.add(l);
       renderLevelGrid();
-      document.getElementById('btn-levels-continue').disabled = selectedLevels.size === 0;
+      syncPerLevelCounts();
+      renderRoundCountArea();
     };
     grid.appendChild(chip);
   }
-  document.getElementById('btn-levels-continue').disabled = selectedLevels.size === 0;
+  updateContinueButtonState();
 }
 
-function renderRoundCountOptions(){
-  const box = document.getElementById('round-count-group');
-  box.style.display = 'flex';
-  box.style.flexWrap = 'wrap';
-  box.innerHTML = '';
-  [8,12,16,24].forEach(n=>{
-    const b = document.createElement('button');
-    b.className = 'btn small' + (n===selectedRoundCount ? ' primary' : '');
-    b.style.flex = '1 1 40%';
-    b.textContent = n + ' 題';
-    b.onclick = ()=>{ selectedRoundCount = n; renderRoundCountOptions(); };
-    box.appendChild(b);
+// 等級勾選改變時，同步 perLevelCounts：拿掉沒選的等級、幫新選的等級補一個預設題數
+function syncPerLevelCounts(){
+  Object.keys(perLevelCounts).forEach(k=>{
+    if(!selectedLevels.has(Number(k))) delete perLevelCounts[k];
   });
+  const n = selectedLevels.size || 1;
+  const defaultEach = Math.max(2, Math.round(12 / n));
+  selectedLevels.forEach(l=>{
+    if(perLevelCounts[l] == null) perLevelCounts[l] = defaultEach;
+  });
+}
+
+// 只選 1 個等級：維持原本的預設按鈕，另外加一個「自訂題數」輸入框。
+// 選 2 個等級以上：每個等級各自一格輸入框，可以分別指定要出幾題，並即時顯示加總。
+function renderRoundCountArea(){
+  const box = document.getElementById('round-count-group');
+  box.innerHTML = '';
+
+  if(selectedLevels.size <= 1){
+    box.style.display = 'grid';
+    box.style.gridTemplateColumns = '1fr 1fr';
+    box.style.gap = '8px';
+
+    [8, 12, 16, 24].forEach(n=>{
+      const b = document.createElement('button');
+      b.className = 'btn small' + (!customRoundActive && singleRoundCount === n ? ' primary' : '');
+      b.textContent = n + ' 題';
+      b.onclick = ()=>{ singleRoundCount = n; customRoundActive = false; renderRoundCountArea(); };
+      box.appendChild(b);
+    });
+
+    const customWrap = document.createElement('div');
+    customWrap.style.cssText = 'grid-column:1 / -1; display:flex; align-items:center; gap:8px; margin-top:6px;';
+    const label = document.createElement('span');
+    label.textContent = '自訂題數：';
+    label.style.cssText = 'font-size:.85rem; color:var(--sub); white-space:nowrap;';
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '4';
+    input.max = '60';
+    input.placeholder = '4～60';
+    input.value = customRoundActive ? singleRoundCount : '';
+    input.style.cssText = 'flex:1; padding:9px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--ink); text-align:center;';
+    input.oninput = ()=>{
+      const v = parseInt(input.value, 10);
+      if(!isNaN(v) && v > 0){
+        singleRoundCount = Math.max(4, Math.min(60, v));
+        customRoundActive = true;
+      } else {
+        customRoundActive = false;
+      }
+      updateContinueButtonState();
+    };
+    customWrap.appendChild(label);
+    customWrap.appendChild(input);
+    box.appendChild(customWrap);
+  } else {
+    box.style.display = 'flex';
+    box.style.flexDirection = 'column';
+    box.style.gap = '10px';
+
+    Array.from(selectedLevels).sort().forEach(l=>{
+      const meta = LEVEL_META[l];
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; align-items:center; gap:10px;';
+      const tag = document.createElement('span');
+      tag.textContent = `Lv.${l} ${meta.name}`;
+      tag.style.cssText = `flex:1; font-size:.85rem; font-weight:700; color:${meta.color};`;
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = '0';
+      input.max = String(Math.min(60, getDataForLevel(l).length));
+      input.value = perLevelCounts[l] != null ? perLevelCounts[l] : 0;
+      input.style.cssText = 'width:84px; padding:9px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--ink); text-align:center;';
+      input.oninput = ()=>{
+        let v = parseInt(input.value, 10);
+        if(isNaN(v) || v < 0) v = 0;
+        const maxV = Math.min(60, getDataForLevel(l).length);
+        if(v > maxV) v = maxV;
+        perLevelCounts[l] = v;
+        renderMultiTotalLabel();
+      };
+      row.appendChild(tag);
+      row.appendChild(input);
+      box.appendChild(row);
+    });
+
+    const totalRow = document.createElement('div');
+    totalRow.id = 'multi-total-label';
+    totalRow.style.cssText = 'text-align:right; font-size:.8rem; color:var(--sub); margin-top:2px;';
+    box.appendChild(totalRow);
+    renderMultiTotalLabel();
+  }
+
+  updateContinueButtonState();
+}
+
+function renderMultiTotalLabel(){
+  const total = Object.values(perLevelCounts).reduce((a,b)=> a + (b||0), 0);
+  const el = document.getElementById('multi-total-label');
+  if(el) el.textContent = `總題數：${total} 題`;
+  updateContinueButtonState();
+}
+
+function updateContinueButtonState(){
+  let ok;
+  if(selectedLevels.size === 0){
+    ok = false;
+  } else if(selectedLevels.size === 1){
+    ok = true;
+  } else {
+    const total = Object.values(perLevelCounts).reduce((a,b)=> a + (b||0), 0);
+    ok = total >= 1;
+  }
+  document.getElementById('btn-levels-continue').disabled = !ok;
 }
 
 document.getElementById('btn-levels-continue').onclick = ()=>{
   const levels = Array.from(selectedLevels).sort();
+  const levelCounts = {};
+  if(levels.length <= 1){
+    levelCounts[levels[0]] = singleRoundCount;
+  } else {
+    levels.forEach(l=>{ levelCounts[l] = perLevelCounts[l] || 0; });
+  }
   if(pendingFlow.mode === 'local'){
-    startLocalGame(levels, selectedRoundCount);
+    startLocalGame(levelCounts);
   } else if(pendingFlow.mode === 'online-host'){
-    createOnlineRoom(levels, selectedRoundCount);
+    createOnlineRoom(levelCounts);
   }
 };
 
@@ -2128,8 +2295,8 @@ let LG = null; // local game state
 let localBuzzTimer=null, localAnswerTimer=null, localTimerStart=0, localTimerDur=0, localTimerRAF=null;
 const LOCAL_DECIDE_WINDOW = 9000;
 
-function startLocalGame(levels, totalRounds){
-  const deck = buildDeck(levels, totalRounds);
+function startLocalGame(levelCounts){
+  const deck = buildDeck(levelCounts);
   const hp0 = computeStartHP(deck);
   LG = {
     deck, idx:0, maxHp:hp0,
@@ -2351,13 +2518,13 @@ function handlePeerDisconnect(){
 }
 
 // ---------- 房主（建立房間）----------
-function createOnlineRoom(levels, totalRounds){
-  const deck = buildDeck(levels, totalRounds);
+function createOnlineRoom(levelCounts){
+  const deck = buildDeck(levelCounts);
   const hp0 = computeStartHP(deck);
   const code = genRoomCode();
   MY_ROLE = 'p1';
   ROOM_CODE = code;
-  ONLINE = { deck, maxHp:hp0, totalRounds, idx:0, hp:{p1:hp0,p2:hp0}, score:{p1:0,p2:0}, round:null };
+  ONLINE = { deck, maxHp:hp0, totalRounds: deck.length, idx:0, hp:{p1:hp0,p2:hp0}, score:{p1:0,p2:0}, round:null };
 
   document.getElementById('waiting-code').textContent = code;
   showScreen('screen-waiting');
@@ -2376,7 +2543,7 @@ function createOnlineRoom(levels, totalRounds){
   peer.on('error', (err)=>{
     if(err && err.type === 'unavailable-id'){
       try{ peer.destroy(); }catch(e){}
-      createOnlineRoom(levels, totalRounds); // 房號極少數衝突，換一組重試
+      createOnlineRoom(levelCounts); // 房號極少數衝突，換一組重試
     } else {
       alert('建立房間時發生連線問題，請確認網路後再試一次。');
       cleanupOnline();
