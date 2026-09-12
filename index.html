@@ -2640,12 +2640,23 @@ function onlineTick(){
 // 離開結算畫面時清乾淨連線資源
 document.getElementById('btn-back-menu').addEventListener('click', cleanupOnline);
 
-// 註冊 Service Worker，讓安裝到手機主畫面後可離線遊玩（僅在真正用 http/https 架站開啟時才會生效，
-// 在 Claude App 內預覽或用 file:// 直接打開檔案時瀏覽器會自動略過，不影響正常遊玩）
-if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('service-worker.js').catch(()=>{});
-  });
+// 註冊 Service Worker，只在「真正獨立開啟的網頁」才啟用離線快取。
+// 在 Claude 預覽（跑在 iframe 裡）就不要註冊——之前這裡沒判斷 iframe，導致在 Claude 預覽時
+// 也偷偷註冊了 Service Worker、把某一版頁面快取住，之後不管怎麼更新檔案，瀏覽器都優先讀取
+// 快取的舊版本，看起來就像改的東西完全沒生效（例如搶答鍵一直沒消失）。
+// 這裡順便做一次自我修復：如果偵測到目前是在 iframe 裡，就把之前可能殘留的 Service Worker
+// 全部註銷掉，讓頁面之後都讀取最新版本。
+if('serviceWorker' in navigator){
+  const isTopLevel = (window.top === window.self);
+  if(!isTopLevel){
+    navigator.serviceWorker.getRegistrations().then(regs=>{
+      regs.forEach(r=> r.unregister());
+    }).catch(()=>{});
+  } else if(location.protocol === 'https:' || location.hostname === 'localhost'){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+    });
+  }
 }
 </script>
 </body>
