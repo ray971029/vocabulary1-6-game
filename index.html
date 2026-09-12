@@ -2334,17 +2334,18 @@ document.getElementById('btn-back-menu').onclick = ()=> showScreen('screen-menu'
 // 連線對戰（WebRTC 點對點直連，透過 PeerJS）
 // 不需要申請任何帳號：兩邊瀏覽器直接連線傳資料，只借用 PeerJS 提供的
 // 公開「牽線」伺服器幫忙對上線（之後遊戲資料就直接兩機互傳）。
-// 房主＝連線中的權威端：所有計時、判定都由房主決定，玩家二只負責顯示畫面／送出操作意圖，
-// 這樣才不會發生兩邊各自判定、互相衝突的問題。
+// 判定方式跟本機雙人對戰一致：不是比誰先按「搶答鍵」，而是直接比誰先點到選項──
+// 房主＝連線中的權威端，兩邊誰的「點選」訊息先送到房主，房主就以那個人的選擇判定整題結果。
 // ==========================================
 let ROOM_CODE = null;
 let MY_ROLE = null;      // 'p1' (房主) | 'p2' (加入者)
 let peer = null;         // 這台裝置的 PeerJS 物件
 let conn = null;         // 與對方的直連通道
 let ONLINE = null;       // 這台裝置看到的對戰狀態（房主是權威版本，玩家二是鏡射）
-let hostBuzzTimeout = null, hostAnswerTimeout = null;
+let hostRoundTimeout = null;
 let onlineTickHandle = null;
 let lastRenderedIdx = -1;
+const ONLINE_DECIDE_WINDOW = 9000; // 跟本機雙人對戰的作答時間一致
 
 function genRoomCode(){
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -2357,7 +2358,7 @@ function sendToPeer(msg){ if(conn && conn.open) conn.send(msg); }
 function msgOf(type, payload){ return Object.assign({type}, payload || {}); }
 
 function cleanupOnline(){
-  clearTimeout(hostBuzzTimeout); clearTimeout(hostAnswerTimeout);
+  clearTimeout(hostRoundTimeout);
   if(onlineTickHandle) clearInterval(onlineTickHandle);
   if(conn){ try{ conn.close(); }catch(e){} }
   if(peer){ try{ peer.destroy(); }catch(e){} }
@@ -2456,16 +2457,12 @@ function guestHandleMessage(msg){
     case 'round-start':
       lastRenderedIdx = -1;
       ONLINE.idx = msg.idx;
-      ONLINE.round = { roundStartTs: msg.ts, buzzedBy:null, buzzTs:null, resolved:false, chosen:null, correctness:null, expired:false };
-      onlineRenderFromState();
-      break;
-    case 'buzz-result':
-      ONLINE.round.buzzedBy = msg.by;
-      ONLINE.round.buzzTs = msg.ts;
+      ONLINE.round = { roundStartTs: msg.ts, resolved:false, resolvedBy:null, chosen:null, correctness:null, expired:false };
       onlineRenderFromState();
       break;
     case 'answer-result':
       ONLINE.round.resolved = true;
+      ONLINE.round.resolvedBy = msg.resolvedBy;
       ONLINE.round.chosen = msg.chosen;
       ONLINE.round.correctness = msg.correct;
       ONLINE.hp = msg.hp; ONLINE.score = msg.score;
@@ -2483,72 +2480,56 @@ function guestHandleMessage(msg){
   }
 }
 
-// 玩家二送出搶答意圖 / 答案，交給房主判定
-function guestSendBuzz(){
-  if(!ONLINE || !ONLINE.round || ONLINE.round.buzzedBy || ONLINE.round.resolved || ONLINE.round.expired) return;
-  sendToPeer(msgOf('buzz-attempt'));
-}
+// 玩家二點了某個選項，把「想選的答案」送給房主判定（不是先搶按鍵，點下去的當下就是答案）
 function guestSendAnswer(text){
-  if(!ONLINE || !ONLINE.round || ONLINE.round.buzzedBy !== 'p2' || ONLINE.round.resolved) return;
-  sendToPeer(msgOf('answer', { text }));
+  if(!ONLINE || !ONLINE.round || ONLINE.round.resolved || ONLINE.round.expired) return;
+  sendToPeer(msgOf('answer-attempt', { text }));
 }
 
 // ---------- 房主端：權威判定邏輯 ----------
 function hostHandleMessage(msg){
-  if(msg.type === 'buzz-attempt') hostTryBuzz('p2');
-  else if(msg.type === 'answer') hostTryAnswer('p2', msg.text);
+  if(msg.type === 'answer-attempt') hostTryAnswer('p2', msg.text);
 }
 
 function hostStartRound(){
   if(ONLINE.hp.p1 <= 0 || ONLINE.hp.p2 <= 0 || ONLINE.idx >= ONLINE.deck.length){ return hostEndGame(); }
-  clearTimeout(hostBuzzTimeout); clearTimeout(hostAnswerTimeout);
+  clearTimeout(hostRoundTimeout);
   lastRenderedIdx = -1;
-  ONLINE.round = { roundStartTs: Date.now(), buzzedBy:null, buzzTs:null, resolved:false, chosen:null, correctness:null, expired:false };
+  ONLINE.round = { roundStartTs: Date.now(), resolved:false, resolvedBy:null, chosen:null, correctness:null, expired:false };
   sendToPeer(msgOf('round-start', { idx: ONLINE.idx, ts: ONLINE.round.roundStartTs }));
   onlineRenderFromState();
-  hostBuzzTimeout = setTimeout(()=>{
-    if(ONLINE.round.buzzedBy) return;
+  hostRoundTimeout = setTimeout(()=>{
+    if(ONLINE.round.resolved) return;
     ONLINE.round.expired = true;
     sendToPeer(msgOf('round-timeout'));
     onlineRenderFromState();
     setTimeout(hostAdvanceRound, RESOLVE_DELAY);
-  }, BUZZ_WINDOW);
+  }, ONLINE_DECIDE_WINDOW);
 }
 
-function hostTryBuzz(role){
-  if(!ONLINE.round || ONLINE.round.buzzedBy || ONLINE.round.resolved || ONLINE.round.expired) return;
-  clearTimeout(hostBuzzTimeout);
-  ONLINE.round.buzzedBy = role;
-  ONLINE.round.buzzTs = Date.now();
-  sendToPeer(msgOf('buzz-result', { by: role, ts: ONLINE.round.buzzTs }));
-  onlineRenderFromState();
-  hostAnswerTimeout = setTimeout(()=>{
-    if(ONLINE.round.resolved) return;
-    hostResolveRound(role, false, null);
-  }, ANSWER_WINDOW);
-}
-
+// role 送出的答案：誰先送到（不管房主自己點的，還是玩家二傳過來的訊息），就以那個人的選擇判定整題
 function hostTryAnswer(role, text){
-  if(!ONLINE.round || ONLINE.round.buzzedBy !== role || ONLINE.round.resolved) return;
-  clearTimeout(hostAnswerTimeout);
+  if(!ONLINE.round || ONLINE.round.resolved || ONLINE.round.expired) return;
+  clearTimeout(hostRoundTimeout);
   const item = ONLINE.deck[ONLINE.idx];
   hostResolveRound(role, text === item.m, text);
 }
 
-function hostResolveRound(buzzer, isCorrect, chosen){
+function hostResolveRound(resolvedBy, isCorrect, chosen){
   const item = ONLINE.deck[ONLINE.idx];
-  const other = buzzer === 'p1' ? 'p2' : 'p1';
+  const other = resolvedBy === 'p1' ? 'p2' : 'p1';
   if(isCorrect){
     const dmg = dmgForLevel(item.l);
     ONLINE.hp[other] = Math.max(0, ONLINE.hp[other] - dmg);
-    ONLINE.score[buzzer]++;
+    ONLINE.score[resolvedBy]++;
   } else {
-    ONLINE.hp[buzzer] = Math.max(0, ONLINE.hp[buzzer] - BACKLASH_DMG);
+    ONLINE.hp[resolvedBy] = Math.max(0, ONLINE.hp[resolvedBy] - BACKLASH_DMG);
   }
   ONLINE.round.resolved = true;
+  ONLINE.round.resolvedBy = resolvedBy;
   ONLINE.round.chosen = chosen;
   ONLINE.round.correctness = isCorrect;
-  sendToPeer(msgOf('answer-result', { chosen, correct:isCorrect, hp:ONLINE.hp, score:ONLINE.score }));
+  sendToPeer(msgOf('answer-result', { resolvedBy, chosen, correct:isCorrect, hp:ONLINE.hp, score:ONLINE.score }));
   onlineRenderFromState();
   setTimeout(hostAdvanceRound, RESOLVE_DELAY);
 }
@@ -2574,17 +2555,8 @@ function hostEndGame(){
 function enterOnlineBattle(){
   document.getElementById('p1-name').textContent = '房主';
   document.getElementById('p2-name').textContent = '玩家二';
-  const buzzRow = document.getElementById('buzz-row');
-  buzzRow.classList.remove('hidden');
-  buzzRow.classList.add('single');
-  const mine = document.getElementById(MY_ROLE === 'p1' ? 'buzz-p1' : 'buzz-p2');
-  const theirs = document.getElementById(MY_ROLE === 'p1' ? 'buzz-p2' : 'buzz-p1');
-  theirs.classList.add('hidden');
-  mine.classList.remove('hidden');
-  mine.querySelector('.key-hint').textContent = '';
-  const attemptBuzz = ()=>{ if(MY_ROLE === 'p1') hostTryBuzz('p1'); else guestSendBuzz(); };
-  mine.onpointerdown = attemptBuzz;
-  mine.onclick = attemptBuzz;
+  // 連線對戰跟本機模式一樣，直接比誰先點到選項，不需要另外的搶答鍵
+  document.getElementById('buzz-row').classList.add('hidden');
   showScreen('screen-battle');
 
   onlineRenderFromState();
@@ -2606,15 +2578,17 @@ function onlineRenderFromState(){
   tag.style.background = LEVEL_META[item.l].color;
   document.getElementById('word-display').textContent = item.w;
 
+  const r = ONLINE.round;
+
   if(ONLINE.idx !== lastRenderedIdx){
     lastRenderedIdx = ONLINE.idx;
     const opt = document.getElementById('options-container');
     opt.innerHTML = '';
     item.options.forEach(text=>{
       const b = document.createElement('button');
-      b.className = 'option-btn dim';
+      b.className = 'option-btn';
       b.textContent = text;
-      b.disabled = true;
+      b.disabled = false; // 一開始就能點，看誰先點到正確答案
       const submit = ()=>{
         if(MY_ROLE === 'p1') hostTryAnswer('p1', text);
         else guestSendAnswer(text);
@@ -2626,45 +2600,28 @@ function onlineRenderFromState(){
   }
 
   const st = document.getElementById('buzz-status');
-  const r = ONLINE.round;
-  const myBuzzBtn = document.getElementById(MY_ROLE === 'p1' ? 'buzz-p1' : 'buzz-p2');
 
   if(r.resolved){
-    myBuzzBtn.disabled = true;
     document.querySelectorAll('#options-container .option-btn').forEach(b=>{
       b.disabled = true;
       if(b.textContent === item.m) b.classList.add('correct');
       else if(b.textContent === r.chosen) b.classList.add('wrong');
     });
-    const buzzerLabel = r.buzzedBy === 'p1' ? '房主' : '玩家二';
+    const label = r.resolvedBy === 'p1' ? '房主' : '玩家二';
     if(r.correctness){
-      st.textContent = '⚡ ' + buzzerLabel + ' 答對！造成傷害 🔥';
-      st.className = 'buzz-status ' + r.buzzedBy;
+      st.textContent = '⚡ ' + label + ' 最快點到正確答案！造成傷害 🔥';
+      st.className = 'buzz-status ' + r.resolvedBy;
     } else {
-      st.textContent = '💢 ' + buzzerLabel + ' 答錯，反噬傷害！';
+      st.textContent = '💢 ' + label + ' 點錯了，反噬傷害！';
       st.className = 'buzz-status warn';
     }
   } else if(r.expired){
-    st.textContent = '⌛ 沒人搶到，跳過這題';
+    st.textContent = '⌛ 誰都沒點到，跳過這題';
     st.className = 'buzz-status warn';
-    myBuzzBtn.disabled = true;
     document.querySelectorAll('#options-container .option-btn').forEach(b=> b.disabled = true);
-  } else if(r.buzzedBy){
-    const buzzerLabel = r.buzzedBy === 'p1' ? '房主' : '玩家二';
-    st.textContent = '⚡ ' + buzzerLabel + ' 搶到了！';
-    st.className = 'buzz-status ' + r.buzzedBy;
-    myBuzzBtn.disabled = true;
-    const isMe = r.buzzedBy === MY_ROLE;
-    document.querySelectorAll('#options-container .option-btn').forEach(b=>{
-      b.disabled = !isMe;
-      b.classList.toggle('dim', !isMe);
-    });
   } else {
-    st.textContent = '';
-    myBuzzBtn.disabled = false;
-    document.querySelectorAll('#options-container .option-btn').forEach(b=>{
-      b.disabled = true; b.classList.add('dim'); b.classList.remove('correct','wrong');
-    });
+    st.textContent = '看誰先點到正確答案！';
+    st.className = 'buzz-status';
   }
 }
 
@@ -2674,16 +2631,9 @@ function onlineTick(){
   if(!ONLINE || !ONLINE.round) return;
   const r = ONLINE.round;
   const fill = document.getElementById('round-timer-fill');
-  let elapsed, dur;
-  if(!r.buzzedBy && !r.resolved && !r.expired){
-    dur = BUZZ_WINDOW; elapsed = Date.now() - r.roundStartTs;
-  } else if(r.buzzedBy && !r.resolved && !r.expired){
-    dur = ANSWER_WINDOW; elapsed = Date.now() - r.buzzTs;
-  } else {
-    fill.style.width = '0%';
-    return;
-  }
-  const pct = Math.max(0, 100 - (elapsed/dur)*100);
+  if(r.resolved || r.expired){ fill.style.width = '0%'; return; }
+  const elapsed = Date.now() - r.roundStartTs;
+  const pct = Math.max(0, 100 - (elapsed/ONLINE_DECIDE_WINDOW)*100);
   fill.style.width = pct + '%';
 }
 
