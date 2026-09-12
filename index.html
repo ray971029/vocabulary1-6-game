@@ -342,7 +342,7 @@
     </div>
   </div>
 
-  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極</div>
+  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-12-03（如果畫面跟這個版號對不上，代表瀏覽器還在讀取舊快取）</div>
 </div>
 
 <!-- PeerJS：連線對戰用的 WebRTC 點對點直連函式庫 -->
@@ -2654,7 +2654,22 @@ if('serviceWorker' in navigator){
     }).catch(()=>{});
   } else if(location.protocol === 'https:' || location.hostname === 'localhost'){
     window.addEventListener('load', ()=>{
-      navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+      navigator.serviceWorker.register('service-worker.js').then(reg=>{
+        // 偵測到有新版本時，等它完全啟用後自動重新整理一次，
+        // 避免使用者要手動重整兩次才會真的換到新版本（用 sessionStorage 擋掉無限重整）。
+        reg.addEventListener('updatefound', ()=>{
+          const nw = reg.installing;
+          if(!nw) return;
+          nw.addEventListener('statechange', ()=>{
+            if(nw.state === 'activated' && navigator.serviceWorker.controller){
+              if(!sessionStorage.getItem('word-duel-auto-reloaded')){
+                sessionStorage.setItem('word-duel-auto-reloaded', '1');
+                location.reload();
+              }
+            }
+          });
+        });
+      }).catch(()=>{});
     });
   }
 }
