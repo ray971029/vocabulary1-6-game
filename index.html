@@ -36,7 +36,6 @@
     --fs-body: clamp(.85rem, 3cqw, 1.05rem);
     --fs-word: clamp(1.8rem, 11cqw, 3.6rem);
     --fs-option: clamp(.85rem, 4cqw, 1.15rem);
-    --fs-buzz: clamp(.95rem, 4.4cqw, 1.3rem);
     --fs-code: clamp(2rem, 12cqw, 3.4rem);
     --fs-end-title: clamp(1.4rem, 6.5cqw, 2.3rem);
     --fs-level-chip: clamp(.82rem, 3.4cqw, 1.05rem);
@@ -44,7 +43,6 @@
     --pad-app: clamp(10px, 3.2cqw, 24px);
     --gap-option: clamp(8px, 1.6vh, 14px);
     --h-option: clamp(52px, 8.5vh, 78px);
-    --h-buzz: clamp(60px, 11vh, 96px);
     --app-max-w: min(94vw, 860px);
   }
   * { box-sizing:border-box; }
@@ -74,7 +72,6 @@
       --fs-body: clamp(.85rem, 2.2vw, 1.05rem);
       --fs-word: clamp(1.8rem, 7.4vw, 3.6rem);
       --fs-option: clamp(.85rem, 2.8vw, 1.15rem);
-      --fs-buzz: clamp(.95rem, 3vw, 1.3rem);
       --fs-code: clamp(2rem, 8vw, 3.4rem);
       --fs-end-title: clamp(1.4rem, 4.4vw, 2.3rem);
       --fs-level-chip: clamp(.82rem, 2.4vw, 1.05rem);
@@ -216,18 +213,6 @@
   .option-btn.split.wrong{ border-color:var(--bad); }
   .option-btn.split.wrong .option-label{ color:var(--bad); }
 
-  .buzz-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:6px; }
-  .buzz-row.single{ grid-template-columns:1fr; }
-  .buzz-btn{
-    padding:clamp(14px,3vh,22px) 10px; min-height:var(--h-buzz); border-radius:16px; border:none; font-weight:900; font-size:var(--fs-buzz);
-    cursor:pointer; color:#fff; letter-spacing:.05em; transition:transform .1s ease;
-  }
-  .buzz-btn:active:not(:disabled){ transform:scale(.96); }
-  .buzz-btn:disabled{ opacity:.35; cursor:default; }
-  .buzz-btn.p1{ background:linear-gradient(135deg,var(--p1),#1d3c8f); box-shadow:0 8px 22px var(--p1-glow); }
-  .buzz-btn.p2{ background:linear-gradient(135deg,var(--p2),#8f1622); box-shadow:0 8px 22px var(--p2-glow); }
-  .key-hint{ display:block; font-size:clamp(.6rem,2.2cqw,.72rem); font-weight:500; opacity:.75; margin-top:3px; }
-
   .combo-badge{
     position:absolute; top:2px; right:8px; font-size:.75rem; font-weight:800; color:var(--gold);
   }
@@ -321,11 +306,6 @@
     </div>
 
     <div class="options-grid" id="options-container"></div>
-
-    <div class="buzz-row" id="buzz-row">
-      <button class="buzz-btn p1" id="buzz-p1">搶答！<span class="key-hint" id="p1-key-hint">按空白鍵</span></button>
-      <button class="buzz-btn p2" id="buzz-p2">搶答！<span class="key-hint" id="p2-key-hint">按 Enter</span></button>
-    </div>
   </div>
 
   <!-- ============ 結算畫面 ============ -->
@@ -342,7 +322,7 @@
     </div>
   </div>
 
-  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-12-03（如果畫面跟這個版號對不上，代表瀏覽器還在讀取舊快取）</div>
+  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-12-04（搶答鍵已徹底刪除；如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
 </div>
 
 <!-- PeerJS：連線對戰用的 WebRTC 點對點直連函式庫 -->
@@ -2158,8 +2138,6 @@ function startLocalGame(levels, totalRounds){
   };
   document.getElementById('p1-name').textContent = '玩家一 (A)';
   document.getElementById('p2-name').textContent = '玩家二 (B)';
-  // 本機雙人對戰不需要搶答鍵，直接隱藏搶答列，改用選項對半按鈕搶答
-  document.getElementById('buzz-row').classList.add('hidden');
 
   showScreen('screen-battle');
   startLocalRound();
@@ -2555,8 +2533,6 @@ function hostEndGame(){
 function enterOnlineBattle(){
   document.getElementById('p1-name').textContent = '房主';
   document.getElementById('p2-name').textContent = '玩家二';
-  // 連線對戰跟本機模式一樣，直接比誰先點到選項，不需要另外的搶答鍵
-  document.getElementById('buzz-row').classList.add('hidden');
   showScreen('screen-battle');
 
   onlineRenderFromState();
