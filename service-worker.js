@@ -1,4 +1,4 @@
-const CACHE_NAME = 'word-duel-ver6';
+const CACHE_NAME = 'word-duel-ver7';
 const ASSETS = [
   './index.html',
   './manifest.json',
