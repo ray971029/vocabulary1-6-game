@@ -238,8 +238,9 @@
     <div class="card row-gap">
       <button class="btn primary" id="btn-mode-local">🏠 本機雙人對戰<br><small style="font-weight:500;opacity:.8">同一台裝置，選項分兩半 A/B 搶按</small></button>
       <button class="btn danger" id="btn-mode-online">🌐 連線對戰<br><small style="font-weight:500;opacity:.8">兩台裝置，用房間代碼配對</small></button>
+      <button class="btn gold" id="btn-mode-practice">📖 個人練習<br><small style="font-weight:500;opacity:.8">自己一個人答題，不計較輸贏，慢慢背</small></button>
     </div>
-    <div class="hint">💡 搶答制：雙方看到同一題，先搶到的人可以作答；答對就對對手造成傷害，等級越高傷害越大，先把對手 HP 歸零（或單字用完時 HP 較高）獲勝。</div>
+    <div class="hint">💡 搶答制：雙方看到同一題，先搶到的人可以作答；答對就對對手造成傷害，等級越高傷害越大，先把對手 HP 歸零（或單字用完時 HP 較高）獲勝。個人練習模式沒有對手、不計時，答完會顯示正確率。</div>
   </div>
 
   <!-- ============ 連線：建立或加入 ============ -->
@@ -311,6 +312,35 @@
     <div class="options-grid" id="options-container"></div>
   </div>
 
+  <!-- ============ 個人練習畫面 ============ -->
+  <div id="screen-practice" class="hidden">
+    <div class="arena-header" style="justify-content:space-between;">
+      <div style="font-weight:700; font-size:var(--fs-body); color:var(--sub);">第 <span id="practice-progress-cur">1</span> / <span id="practice-progress-total">12</span> 題</div>
+      <div style="font-weight:700; font-size:var(--fs-body); color:var(--good);">答對 <span id="practice-correct-count">0</span> 題</div>
+    </div>
+
+    <div class="word-stage">
+      <span class="level-tag" id="practice-level-tag">Lv.1</span>
+      <div id="practice-word-display">Loading...</div>
+      <div class="buzz-status" id="practice-status"></div>
+    </div>
+
+    <div class="options-grid" id="practice-options-container"></div>
+  </div>
+
+  <!-- ============ 個人練習結算畫面 ============ -->
+  <div id="screen-practice-end" class="hidden">
+    <div class="card">
+      <div class="end-title">🎉 練習完成！</div>
+      <div class="end-sub" id="practice-end-sub">答對 0 / 0 題</div>
+      <div class="end-stats">
+        <div class="end-stat"><b id="practice-end-accuracy">0%</b><span>正確率</span></div>
+      </div>
+      <button class="btn gold" id="btn-practice-again">再練習一次</button>
+      <button class="btn ghost" id="btn-practice-back-menu" style="border:1px solid var(--line); margin-top:10px;">回到主選單</button>
+    </div>
+  </div>
+
   <!-- ============ 結算畫面 ============ -->
   <div id="screen-end" class="hidden">
     <div class="card">
@@ -325,7 +355,7 @@
     </div>
   </div>
 
-  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-12-07（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
+  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-12-10（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
 </div>
 
 <!-- PeerJS：連線對戰用的 WebRTC 點對點直連函式庫 -->
@@ -2091,9 +2121,14 @@ let selectedLevels = new Set([1]);
 let singleRoundCount = 12;     // 只選 1 個等級時使用
 let customRoundActive = false; // 是否正在用「自訂題數」而不是預設按鈕
 let perLevelCounts = {};       // 選 2 個等級以上時，每個等級各自的題數 { level: count }
+let lastLevelCounts = null;    // 記住上一場實際使用的等級/題數設定，供「再來一場」重複使用
 
 document.getElementById('btn-mode-local').onclick = ()=>{
   pendingFlow = { mode:'local' };
+  openLevelsScreen();
+};
+document.getElementById('btn-mode-practice').onclick = ()=>{
+  pendingFlow = { mode:'practice' };
   openLevelsScreen();
 };
 // 連線對戰改用 WebRTC 點對點直連（PeerJS），只要兩邊都有網路就能連，
@@ -2127,7 +2162,7 @@ function openLevelsScreen(){
   syncPerLevelCounts();
   renderRoundCountArea();
   document.getElementById('levels-back').onclick = ()=>{
-    showScreen(pendingFlow.mode === 'local' ? 'screen-menu' : 'screen-online-choice');
+    showScreen(pendingFlow.mode === 'online-host' ? 'screen-online-choice' : 'screen-menu');
   };
   showScreen('screen-levels');
 }
@@ -2281,10 +2316,13 @@ document.getElementById('btn-levels-continue').onclick = ()=>{
   } else {
     levels.forEach(l=>{ levelCounts[l] = perLevelCounts[l] || 0; });
   }
+  lastLevelCounts = levelCounts;
   if(pendingFlow.mode === 'local'){
     startLocalGame(levelCounts);
   } else if(pendingFlow.mode === 'online-host'){
     createOnlineRoom(levelCounts);
+  } else if(pendingFlow.mode === 'practice'){
+    startPracticeSession(levelCounts);
   }
 };
 
@@ -2470,10 +2508,89 @@ function renderEndScreen(winner, name1, name2, score1, score2, hp, maxHp){
 }
 
 document.getElementById('btn-play-again').onclick = ()=>{
-  if(ROOM_CODE){ showScreen('screen-menu'); ROOM_CODE=null; }
-  else showScreen('screen-menu');
+  if(MY_ROLE === 'p1'){
+    onlineHostPlayAgain();
+  } else if(MY_ROLE === 'p2'){
+    alert('連線對戰的「再來一場」要由房主那邊按下才會開始，請留在這個畫面等待對手動作。');
+  } else if(lastLevelCounts){
+    startLocalGame(lastLevelCounts);
+  } else {
+    showScreen('screen-menu');
+  }
 };
 document.getElementById('btn-back-menu').onclick = ()=> showScreen('screen-menu');
+
+// ==========================================
+// 個人練習（沒有對手，不計時，答完顯示正確率）
+// ==========================================
+let PG = null; // practice game state
+
+function startPracticeSession(levelCounts){
+  const deck = buildDeck(levelCounts);
+  PG = { deck, idx:0, correct:0 };
+  document.getElementById('practice-progress-total').textContent = deck.length;
+  showScreen('screen-practice');
+  renderPracticeQuestion();
+}
+
+function renderPracticeQuestion(){
+  if(!PG || PG.idx >= PG.deck.length){ return endPracticeSession(); }
+  const item = PG.deck[PG.idx];
+  document.getElementById('practice-progress-cur').textContent = PG.idx + 1;
+  document.getElementById('practice-correct-count').textContent = PG.correct;
+
+  const tag = document.getElementById('practice-level-tag');
+  tag.textContent = 'Lv.' + item.l + ' ' + LEVEL_META[item.l].name;
+  tag.style.background = LEVEL_META[item.l].color;
+  document.getElementById('practice-word-display').textContent = item.w;
+  document.getElementById('practice-status').textContent = '';
+  document.getElementById('practice-status').className = 'buzz-status';
+
+  const opt = document.getElementById('practice-options-container');
+  opt.innerHTML = '';
+  item.options.forEach(text=>{
+    const b = document.createElement('button');
+    b.className = 'option-btn';
+    b.textContent = text;
+    b.onclick = ()=> practiceOnSelect(text, item.m);
+    opt.appendChild(b);
+  });
+}
+
+function practiceOnSelect(chosen, correctText){
+  const opt = document.getElementById('practice-options-container');
+  const isCorrect = chosen === correctText;
+  Array.from(opt.children).forEach(b=>{
+    b.disabled = true;
+    if(b.textContent === correctText) b.classList.add('correct');
+    else if(b.textContent === chosen) b.classList.add('wrong');
+  });
+  const st = document.getElementById('practice-status');
+  if(isCorrect){
+    PG.correct++;
+    document.getElementById('practice-correct-count').textContent = PG.correct;
+    st.textContent = '✅ 答對了！';
+    st.className = 'buzz-status p1';
+  } else {
+    st.textContent = '❌ 答錯了，正確答案是「' + correctText + '」';
+    st.className = 'buzz-status warn';
+  }
+  setTimeout(()=>{ PG.idx++; renderPracticeQuestion(); }, RESOLVE_DELAY);
+}
+
+function endPracticeSession(){
+  const total = PG.deck.length;
+  const correct = PG.correct;
+  const pct = total > 0 ? Math.round((correct/total)*100) : 0;
+  document.getElementById('practice-end-sub').textContent = `答對 ${correct} / ${total} 題`;
+  document.getElementById('practice-end-accuracy').textContent = pct + '%';
+  showScreen('screen-practice-end');
+}
+
+document.getElementById('btn-practice-again').onclick = ()=>{
+  startPracticeSession(lastLevelCounts || {1:12});
+};
+document.getElementById('btn-practice-back-menu').onclick = ()=> showScreen('screen-menu');
 
 // ==========================================
 // 連線對戰（WebRTC 點對點直連，透過 PeerJS）
@@ -2511,7 +2628,7 @@ function cleanupOnline(){
 }
 
 function handlePeerDisconnect(){
-  if(document.getElementById('screen-battle').classList.contains('hidden')) return; // 已經離開對戰畫面就不用再提示
+  if(document.getElementById('screen-battle').classList.contains('hidden')) return; // 不在對戰畫面（例如已經在結算畫面等對手再來一場）就不用跳提示
   alert('對手已離線，連線中斷了。');
   cleanupOnline();
   showScreen('screen-menu');
@@ -2619,7 +2736,8 @@ function guestHandleMessage(msg){
       break;
     case 'game-over':
       ONLINE.hp = msg.hp; ONLINE.score = msg.score;
-      { const maxHp = ONLINE.maxHp; cleanupOnline();
+      if(onlineTickHandle) clearInterval(onlineTickHandle);
+      { const maxHp = ONLINE.maxHp;
         renderEndScreen(msg.winner, '房主', '玩家二', msg.score.p1, msg.score.p2, msg.hp, maxHp); }
       break;
   }
@@ -2691,9 +2809,27 @@ function hostAdvanceRound(){
 function hostEndGame(){
   const winner = determineWinner(ONLINE.hp, ONLINE.score);
   sendToPeer(msgOf('game-over', { winner, hp: ONLINE.hp, score: ONLINE.score }));
+  clearTimeout(hostRoundTimeout);
+  if(onlineTickHandle) clearInterval(onlineTickHandle);
   const maxHp = ONLINE.maxHp, score = ONLINE.score, hp = ONLINE.hp;
-  cleanupOnline();
   renderEndScreen(winner, '房主', '玩家二', score.p1, score.p2, hp, maxHp);
+}
+
+// 房主按下「再來一場」：沿用同一條連線，直接用上一場相同的等級/題數設定開新的一場，
+// 不需要重新產生房間代碼、玩家二也不用重新輸入代碼加入。若對手已經離線就提示並回主選單。
+function onlineHostPlayAgain(){
+  if(!conn || !conn.open){
+    alert('對手已經離線了，沒辦法直接再來一場，請重新建立房間邀請對手加入。');
+    cleanupOnline();
+    showScreen('screen-menu');
+    return;
+  }
+  const deck = buildDeck(lastLevelCounts || {1:12});
+  const hp0 = computeStartHP(deck);
+  ONLINE = { deck, maxHp:hp0, totalRounds: deck.length, idx:0, hp:{p1:hp0,p2:hp0}, score:{p1:0,p2:0}, round:null };
+  sendToPeer(msgOf('init', { deck: ONLINE.deck, maxHp: ONLINE.maxHp, totalRounds: ONLINE.totalRounds }));
+  enterOnlineBattle();
+  hostStartRound();
 }
 
 // ---------- 共用：畫面渲染 ----------
