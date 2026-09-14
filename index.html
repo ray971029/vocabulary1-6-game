@@ -168,7 +168,7 @@
     display:inline-block; font-size:clamp(.65rem,2.4cqw,.78rem); font-weight:800; padding:3px 10px; border-radius:20px;
     background:var(--chip-bg); color:#fff; margin-bottom:10px; letter-spacing:.05em;
   }
-  #word-display{ font-size:var(--fs-word); font-weight:900; word-break:break-word; line-height:1.2; }
+  #word-display, #practice-word-display{ font-size:var(--fs-word); font-weight:900; word-break:break-word; line-height:1.2; }
   .buzz-status{ min-height:clamp(20px,3.4vh,28px); font-weight:800; margin-top:8px; font-size:clamp(.8rem,3cqw,1rem); }
   .buzz-status.p1{ color:var(--p1); }
   .buzz-status.p2{ color:var(--p2); }
@@ -234,6 +234,7 @@
   <div id="screen-menu">
     <h1 class="brand"><span class="sword">⚔️</span> 單字對決</h1>
     <div class="tagline">Word Duel — 依 7000 單字六級分級，搶答制對戰</div>
+    <button class="back-link" id="btn-edit-name" style="text-align:left; padding:0 0 16px;">✏️ 暱稱：<span id="current-name-label">（尚未設定）</span>（點此更改）</button>
 
     <div class="card row-gap">
       <button class="btn primary" id="btn-mode-local">🏠 本機雙人對戰<br><small style="font-weight:500;opacity:.8">同一台裝置，選項分兩半 A/B 搶按</small></button>
@@ -241,6 +242,17 @@
       <button class="btn gold" id="btn-mode-practice">📖 個人練習<br><small style="font-weight:500;opacity:.8">自己一個人答題，不計較輸贏，慢慢背</small></button>
     </div>
     <div class="hint">💡 搶答制：雙方看到同一題，先搶到的人可以作答；答對就對對手造成傷害，等級越高傷害越大，先把對手 HP 歸零（或單字用完時 HP 較高）獲勝。個人練習模式沒有對手、不計時，答完會顯示正確率。</div>
+  </div>
+
+  <!-- ============ 暱稱設定畫面 ============ -->
+  <div id="screen-name-setup" class="hidden">
+    <button class="back-link hidden" id="name-setup-back" data-back="screen-menu">← 返回</button>
+    <h1 class="brand"><span class="sword">⚔️</span> 單字對決</h1>
+    <div class="tagline" id="name-setup-tagline">先幫自己取個名字，連線對戰時對手會看到這個名字</div>
+    <div class="card row-gap">
+      <input type="text" id="name-setup-input" class="code-input" style="text-transform:none; letter-spacing:normal; font-size:1.15rem;" placeholder="輸入你的暱稱" maxlength="12">
+      <button class="btn gold" id="btn-name-setup-confirm">儲存並繼續</button>
+    </div>
   </div>
 
   <!-- ============ 連線：建立或加入 ============ -->
@@ -314,6 +326,7 @@
 
   <!-- ============ 個人練習畫面 ============ -->
   <div id="screen-practice" class="hidden">
+    <button class="back-link" data-back="screen-menu" style="padding-bottom:6px;">← 返回</button>
     <div class="arena-header" style="justify-content:space-between;">
       <div style="font-weight:700; font-size:var(--fs-body); color:var(--sub);">第 <span id="practice-progress-cur">1</span> / <span id="practice-progress-total">12</span> 題</div>
       <div style="font-weight:700; font-size:var(--fs-body); color:var(--good);">答對 <span id="practice-correct-count">0</span> 題</div>
@@ -355,7 +368,7 @@
     </div>
   </div>
 
-  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-13-10</div>
+  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-12-13（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
 </div>
 
 <!-- PeerJS：連線對戰用的 WebRTC 點對點直連函式庫 -->
@@ -2039,6 +2052,56 @@ function showScreen(id){
 }
 
 // ==========================================
+// 玩家暱稱：第一次開啟時詢問，之後存在裝置本機（localStorage），連線對戰時會顯示這個名字。
+// 提醒：localStorage 在 Claude 預覽這種沙盒 iframe 環境可能無法持久化（會被瀏覽器擋掉寫入），
+// 這種情況下名字只能記得「這次使用期間」，重新整理就會忘記；但真的架站成獨立網頁/PWA 使用時，
+// 存取都是正常的，暱稱會一直記住。這裡用 try/catch 包起來，就算存取失敗也不會讓遊戲整個壞掉。
+// ==========================================
+const NAME_STORAGE_KEY = 'wordDuelPlayerName';
+let playerName = '';
+let hostDisplayName = '';
+let guestDisplayName = '';
+
+function loadPlayerName(){
+  try{ return (localStorage.getItem(NAME_STORAGE_KEY) || '').trim(); }catch(e){ return ''; }
+}
+function savePlayerName(name){
+  try{ localStorage.setItem(NAME_STORAGE_KEY, name); }catch(e){ /* 沙盒環境擋掉寫入，忽略即可，不影響遊戲本身 */ }
+}
+function updateNameLabel(){
+  const el = document.getElementById('current-name-label');
+  if(el) el.textContent = playerName || '（尚未設定）';
+}
+function openNameSetup(isFirstRun){
+  document.getElementById('name-setup-back').classList.toggle('hidden', !!isFirstRun);
+  document.getElementById('name-setup-tagline').textContent = isFirstRun
+    ? '先幫自己取個名字，連線對戰時對手會看到這個名字'
+    : '更改你的暱稱';
+  const input = document.getElementById('name-setup-input');
+  input.value = isFirstRun ? '' : playerName;
+  showScreen('screen-name-setup');
+  input.focus();
+}
+document.getElementById('btn-edit-name').onclick = ()=> openNameSetup(false);
+document.getElementById('btn-name-setup-confirm').onclick = ()=>{
+  const input = document.getElementById('name-setup-input');
+  const val = input.value.trim().slice(0, 12);
+  if(!val){ input.placeholder = '請輸入暱稱才能繼續'; input.focus(); return; }
+  playerName = val;
+  savePlayerName(playerName);
+  updateNameLabel();
+  showScreen('screen-menu');
+};
+document.getElementById('name-setup-input').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter') document.getElementById('btn-name-setup-confirm').onclick();
+});
+
+// 開機檢查：沒有存過名字的話，先要求輸入才能進主選單
+playerName = loadPlayerName();
+updateNameLabel();
+if(!playerName){ openNameSetup(true); }
+
+// ==========================================
 // 封鎖右鍵選單與常見的開發者工具快捷鍵（F12、Ctrl+Shift+I/J/C、Ctrl+U）。
 // 提醒：這只能擋掉「隨手」想看原始碼的人，擋不住真的想拆解網頁的人
 // （瀏覽器選單一樣能開發者工具、也能直接讀取下載下來的檔案），純粹是降低隨手複製的方便度。
@@ -2121,6 +2184,7 @@ let selectedLevels = new Set([1]);
 let singleRoundCount = 12;     // 只選 1 個等級時使用
 let customRoundActive = false; // 是否正在用「自訂題數」而不是預設按鈕
 let perLevelCounts = {};       // 選 2 個等級以上時，每個等級各自的題數 { level: count }
+let perLevelTouched = new Set(); // 玩家自己手動改過題數的等級，改選等級時不會覆蓋掉這些自訂值
 let lastLevelCounts = null;    // 記住上一場實際使用的等級/題數設定，供「再來一場」重複使用
 
 document.getElementById('btn-mode-local').onclick = ()=>{
@@ -2194,17 +2258,61 @@ function renderLevelGrid(){
 // 等級勾選改變時，同步 perLevelCounts：拿掉沒選的等級、幫新選的等級補一個預設題數
 function syncPerLevelCounts(){
   Object.keys(perLevelCounts).forEach(k=>{
-    if(!selectedLevels.has(Number(k))) delete perLevelCounts[k];
+    if(!selectedLevels.has(Number(k))){
+      delete perLevelCounts[k];
+      perLevelTouched.delete(Number(k));
+    }
   });
   const n = selectedLevels.size || 1;
   const defaultEach = Math.max(2, Math.round(12 / n));
+  // 沒被玩家手動改過的等級，每次改選都重新均分成一樣的預設值，
+  // 不會因為「先選的」還留著舊的（等級數較少時算出的）預設值而變得比較多。
   selectedLevels.forEach(l=>{
-    if(perLevelCounts[l] == null) perLevelCounts[l] = defaultEach;
+    if(!perLevelTouched.has(l)) perLevelCounts[l] = defaultEach;
   });
 }
 
-// 只選 1 個等級：維持原本的預設按鈕，另外加一個「自訂題數」輸入框。
-// 選 2 個等級以上：每個等級各自一格輸入框，可以分別指定要出幾題，並即時顯示加總。
+// 建立一個「− [輸入框] +」的數字輸入元件，省去玩家手動打字的時間
+function createStepperInput({ value, min, max, onChange }){
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex; align-items:stretch; gap:5px;';
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = String(min);
+  input.max = String(max);
+  input.value = value;
+  input.style.cssText = 'flex:1; min-width:0; padding:8px 4px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--ink); text-align:center; font-weight:700;';
+
+  function clamp(v){ return Math.max(min, Math.min(max, isNaN(v) ? min : v)); }
+  function commit(v){ v = clamp(v); input.value = v; onChange(v); }
+
+  const btnMinus = document.createElement('button');
+  btnMinus.type = 'button';
+  btnMinus.textContent = '−';
+  btnMinus.style.cssText = 'width:34px; flex-shrink:0; border-radius:8px; border:1px solid var(--line); background:var(--panel-2); color:var(--ink); font-weight:900; font-size:1.05rem; cursor:pointer;';
+  btnMinus.onclick = ()=> commit((parseInt(input.value,10)||min) - 1);
+
+  const btnPlus = document.createElement('button');
+  btnPlus.type = 'button';
+  btnPlus.textContent = '+';
+  btnPlus.style.cssText = btnMinus.style.cssText;
+  btnPlus.onclick = ()=> commit((parseInt(input.value,10)||min) + 1);
+
+  input.oninput = ()=>{
+    const v = parseInt(input.value, 10);
+    onChange(isNaN(v) ? min : v); // 打字過程先不強制夾住範圍，避免游標亂跳
+  };
+  input.onblur = ()=> commit(parseInt(input.value, 10));
+
+  wrap.appendChild(btnMinus);
+  wrap.appendChild(input);
+  wrap.appendChild(btnPlus);
+  return wrap;
+}
+
+// 只選 1 個等級：維持原本的預設按鈕，另外加一個「自訂題數」輸入框（含 +/− 快速調整）。
+// 選 2 個等級以上：每個等級各自一格輸入框（左右兩欄排版），可以分別指定要出幾題，並即時顯示加總。
 function renderRoundCountArea(){
   const box = document.getElementById('round-count-group');
   box.innerHTML = '';
@@ -2227,60 +2335,40 @@ function renderRoundCountArea(){
     const label = document.createElement('span');
     label.textContent = '自訂題數：';
     label.style.cssText = 'font-size:.85rem; color:var(--sub); white-space:nowrap;';
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.min = '4';
-    input.max = '60';
-    input.placeholder = '4～60';
-    input.value = customRoundActive ? singleRoundCount : '';
-    input.style.cssText = 'flex:1; padding:9px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--ink); text-align:center;';
-    input.oninput = ()=>{
-      const v = parseInt(input.value, 10);
-      if(!isNaN(v) && v > 0){
-        singleRoundCount = Math.max(4, Math.min(60, v));
-        customRoundActive = true;
-      } else {
-        customRoundActive = false;
-      }
-      updateContinueButtonState();
-    };
+    const stepper = createStepperInput({
+      value: customRoundActive ? singleRoundCount : 12,
+      min: 4, max: 60,
+      onChange: (v)=>{ singleRoundCount = v; customRoundActive = true; updateContinueButtonState(); }
+    });
     customWrap.appendChild(label);
-    customWrap.appendChild(input);
+    customWrap.appendChild(stepper);
     box.appendChild(customWrap);
   } else {
-    box.style.display = 'flex';
-    box.style.flexDirection = 'column';
+    box.style.display = 'grid';
+    box.style.gridTemplateColumns = '1fr 1fr';
     box.style.gap = '10px';
 
-    Array.from(selectedLevels).sort().forEach(l=>{
+    Array.from(selectedLevels).sort((a,b)=> a - b).forEach(l=>{
       const meta = LEVEL_META[l];
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex; align-items:center; gap:10px;';
+      const cell = document.createElement('div');
+      cell.style.cssText = 'display:flex; flex-direction:column; gap:6px; padding:10px; border:1px solid var(--line); border-radius:10px; background:var(--panel);';
       const tag = document.createElement('span');
       tag.textContent = `Lv.${l} ${meta.name}`;
-      tag.style.cssText = `flex:1; font-size:.85rem; font-weight:700; color:${meta.color};`;
-      const input = document.createElement('input');
-      input.type = 'number';
-      input.min = '0';
-      input.max = String(Math.min(60, getDataForLevel(l).length));
-      input.value = perLevelCounts[l] != null ? perLevelCounts[l] : 0;
-      input.style.cssText = 'width:84px; padding:9px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--ink); text-align:center;';
-      input.oninput = ()=>{
-        let v = parseInt(input.value, 10);
-        if(isNaN(v) || v < 0) v = 0;
-        const maxV = Math.min(60, getDataForLevel(l).length);
-        if(v > maxV) v = maxV;
-        perLevelCounts[l] = v;
-        renderMultiTotalLabel();
-      };
-      row.appendChild(tag);
-      row.appendChild(input);
-      box.appendChild(row);
+      tag.style.cssText = `font-size:.78rem; font-weight:700; color:${meta.color};`;
+      const maxV = Math.min(60, getDataForLevel(l).length);
+      const stepper = createStepperInput({
+        value: perLevelCounts[l] != null ? perLevelCounts[l] : 0,
+        min: 0, max: maxV,
+        onChange: (v)=>{ perLevelCounts[l] = v; perLevelTouched.add(l); renderMultiTotalLabel(); }
+      });
+      cell.appendChild(tag);
+      cell.appendChild(stepper);
+      box.appendChild(cell);
     });
 
     const totalRow = document.createElement('div');
     totalRow.id = 'multi-total-label';
-    totalRow.style.cssText = 'text-align:right; font-size:.8rem; color:var(--sub); margin-top:2px;';
+    totalRow.style.cssText = 'grid-column:1 / -1; text-align:right; font-size:.8rem; color:var(--sub); margin-top:2px;';
     box.appendChild(totalRow);
     renderMultiTotalLabel();
   }
@@ -2309,7 +2397,7 @@ function updateContinueButtonState(){
 }
 
 document.getElementById('btn-levels-continue').onclick = ()=>{
-  const levels = Array.from(selectedLevels).sort();
+  const levels = Array.from(selectedLevels).sort((a,b)=> a - b);
   const levelCounts = {};
   if(levels.length <= 1){
     levelCounts[levels[0]] = singleRoundCount;
@@ -2641,6 +2729,8 @@ function createOnlineRoom(levelCounts){
   const code = genRoomCode();
   MY_ROLE = 'p1';
   ROOM_CODE = code;
+  hostDisplayName = playerName || '房主';
+  guestDisplayName = '';
   ONLINE = { deck, maxHp:hp0, totalRounds: deck.length, idx:0, hp:{p1:hp0,p2:hp0}, score:{p1:0,p2:0}, round:null };
 
   document.getElementById('waiting-code').textContent = code;
@@ -2650,7 +2740,7 @@ function createOnlineRoom(levelCounts){
   peer.on('connection', (c)=>{
     conn = c;
     conn.on('open', ()=>{
-      sendToPeer(msgOf('init', { deck: ONLINE.deck, maxHp: ONLINE.maxHp, totalRounds: ONLINE.totalRounds }));
+      sendToPeer(msgOf('init', { deck: ONLINE.deck, maxHp: ONLINE.maxHp, totalRounds: ONLINE.totalRounds, hostName: hostDisplayName }));
       enterOnlineBattle();
       hostStartRound();
     });
@@ -2685,6 +2775,8 @@ document.getElementById('btn-join-confirm').onclick = ()=>{
 
   MY_ROLE = 'p2';
   ROOM_CODE = code;
+  guestDisplayName = playerName || '玩家二';
+  hostDisplayName = '';
   errBox.textContent = '連線中…';
 
   peer = new Peer();
@@ -2693,6 +2785,7 @@ document.getElementById('btn-join-confirm').onclick = ()=>{
     conn.on('open', ()=>{
       errBox.style.color = 'var(--good)';
       errBox.textContent = '已連線，等待房主開始對戰…';
+      sendToPeer(msgOf('hello', { name: guestDisplayName }));
     });
     conn.on('data', guestHandleMessage);
     conn.on('close', handlePeerDisconnect);
@@ -2712,6 +2805,7 @@ document.getElementById('btn-join-confirm').onclick = ()=>{
 function guestHandleMessage(msg){
   switch(msg.type){
     case 'init':
+      hostDisplayName = (msg.hostName || '').slice(0,12) || '房主';
       ONLINE = { deck: msg.deck, maxHp: msg.maxHp, totalRounds: msg.totalRounds, idx:0,
                  hp:{p1:msg.maxHp, p2:msg.maxHp}, score:{p1:0,p2:0}, round:null };
       enterOnlineBattle();
@@ -2738,7 +2832,7 @@ function guestHandleMessage(msg){
       ONLINE.hp = msg.hp; ONLINE.score = msg.score;
       if(onlineTickHandle) clearInterval(onlineTickHandle);
       { const maxHp = ONLINE.maxHp;
-        renderEndScreen(msg.winner, '房主', '玩家二', msg.score.p1, msg.score.p2, msg.hp, maxHp); }
+        renderEndScreen(msg.winner, hostDisplayName || '房主', guestDisplayName || '玩家二', msg.score.p1, msg.score.p2, msg.hp, maxHp); }
       break;
   }
 }
@@ -2751,7 +2845,12 @@ function guestSendAnswer(text){
 
 // ---------- 房主端：權威判定邏輯 ----------
 function hostHandleMessage(msg){
-  if(msg.type === 'answer-attempt') hostTryAnswer('p2', msg.text);
+  if(msg.type === 'answer-attempt'){
+    hostTryAnswer('p2', msg.text);
+  } else if(msg.type === 'hello'){
+    guestDisplayName = (msg.name || '').slice(0,12) || '玩家二';
+    onlineUpdateNames();
+  }
 }
 
 function hostStartRound(){
@@ -2812,7 +2911,7 @@ function hostEndGame(){
   clearTimeout(hostRoundTimeout);
   if(onlineTickHandle) clearInterval(onlineTickHandle);
   const maxHp = ONLINE.maxHp, score = ONLINE.score, hp = ONLINE.hp;
-  renderEndScreen(winner, '房主', '玩家二', score.p1, score.p2, hp, maxHp);
+  renderEndScreen(winner, hostDisplayName || '房主', guestDisplayName || '玩家二', score.p1, score.p2, hp, maxHp);
 }
 
 // 房主按下「再來一場」：沿用同一條連線，直接用上一場相同的等級/題數設定開新的一場，
@@ -2833,9 +2932,12 @@ function onlineHostPlayAgain(){
 }
 
 // ---------- 共用：畫面渲染 ----------
+function onlineUpdateNames(){
+  document.getElementById('p1-name').textContent = hostDisplayName || '房主';
+  document.getElementById('p2-name').textContent = guestDisplayName || '玩家二';
+}
 function enterOnlineBattle(){
-  document.getElementById('p1-name').textContent = '房主';
-  document.getElementById('p2-name').textContent = '玩家二';
+  onlineUpdateNames();
   showScreen('screen-battle');
 
   onlineRenderFromState();
@@ -2886,7 +2988,7 @@ function onlineRenderFromState(){
       if(b.textContent === item.m) b.classList.add('correct');
       else if(b.textContent === r.chosen) b.classList.add('wrong');
     });
-    const label = r.resolvedBy === 'p1' ? '房主' : '玩家二';
+    const label = r.resolvedBy === 'p1' ? (hostDisplayName || '房主') : (guestDisplayName || '玩家二');
     if(r.correctness){
       st.textContent = '⚡ ' + label + ' 最快點到正確答案！造成傷害 🔥';
       st.className = 'buzz-status ' + r.resolvedBy;
