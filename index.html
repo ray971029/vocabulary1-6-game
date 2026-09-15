@@ -224,10 +224,75 @@
   .end-stat b{ display:block; font-size:clamp(1.3rem,5.6cqw,1.9rem); }
   .end-stat span{ color:var(--sub); font-size:var(--fs-tagline); }
 
+  /* 正確率橫條動畫（個人練習結算） */
+  .accuracy-track{
+    height:24px; border-radius:12px; background:#000; border:1px solid var(--line);
+    overflow:hidden; position:relative; margin:16px 0 8px;
+  }
+  .accuracy-fill{
+    height:100%; width:0%; border-radius:12px;
+    background:linear-gradient(90deg, var(--bad), var(--warn), var(--good));
+    transition:width 1.3s cubic-bezier(.16,1,.3,1);
+  }
+  .accuracy-label{ text-align:center; font-weight:800; font-size:1.15rem; }
+  .accuracy-label b{ color:var(--gold); font-size:1.3rem; }
+
+  /* 勝利揭曉動畫 / 延長賽提示（共用同一套動畫樣式） */
+  .reveal-screen{
+    position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    flex:1; text-align:center; overflow:hidden; min-height:60vh;
+  }
+  .reveal-glow{
+    position:absolute; inset:-20%; border-radius:50%;
+    background:radial-gradient(circle, var(--glow-color, var(--gold)) 0%, transparent 70%);
+    opacity:.35; animation:revealGlowPulse 1.6s ease-in-out infinite; filter:blur(10px);
+  }
+  .reveal-icon{
+    font-size:5.5rem; position:relative; animation:trophyPop .6s cubic-bezier(.34,1.56,.64,1) both;
+  }
+  .reveal-title{
+    font-size:clamp(1.4rem,7cqw,2.2rem); font-weight:900; margin-top:16px; position:relative;
+    animation:revealTitleIn .5s ease-out .25s both;
+  }
+  .reveal-sub{
+    margin-top:8px; position:relative; animation:revealTitleIn .5s ease-out .45s both;
+    color:var(--sub); font-size:var(--fs-body); padding:0 20px;
+  }
+  @keyframes trophyPop{
+    0%{ transform:scale(0) rotate(-15deg); opacity:0; }
+    60%{ transform:scale(1.15) rotate(5deg); opacity:1; }
+    100%{ transform:scale(1) rotate(0deg); opacity:1; }
+  }
+  @keyframes revealTitleIn{
+    0%{ transform:translateY(20px); opacity:0; }
+    100%{ transform:translateY(0); opacity:1; }
+  }
+  @keyframes revealGlowPulse{
+    0%,100%{ transform:scale(.9); opacity:.25; }
+    50%{ transform:scale(1.15); opacity:.5; }
+  }
+
   .footer-note{ margin-top:auto; padding-top:18px; color:var(--sub); font-size:clamp(.62rem,2cqw,.72rem); text-align:center; }
+
+  /* 本機雙人對戰的強制橫向：能鎖定的裝置由 JS 處理，鎖不了的（例如 iOS）就顯示這個提示畫面代替 */
+  #rotate-hint{
+    display:none; position:fixed; inset:0; z-index:9999; background:var(--bg);
+    flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px; color:var(--ink);
+  }
+  @media (orientation: portrait){
+    body.force-landscape-mode #rotate-hint{ display:flex; }
+    body.force-landscape-mode .app{ display:none; }
+  }
 </style>
 </head>
 <body>
+<!-- 部分瀏覽器（例如 iOS Safari、或缺少全螢幕權限的環境）沒辦法用程式強制轉橫向，
+     這種情況下改用這個提示畫面請玩家自己把裝置轉橫，只有本機雙人對戰會用到。 -->
+<div id="rotate-hint">
+  <div style="font-size:3rem; margin-bottom:12px;">📱↻</div>
+  <div style="font-size:1.1rem; font-weight:700;">請將裝置橫向放置</div>
+  <div class="hint" style="margin-top:8px; max-width:280px;">本機雙人對戰建議橫式操作，兩人比較好同時搶答</div>
+</div>
 <div class="app">
 
   <!-- ============ 選單畫面 ============ -->
@@ -250,7 +315,7 @@
     <h1 class="brand"><span class="sword">⚔️</span> 單字對決</h1>
     <div class="tagline" id="name-setup-tagline">先幫自己取個名字，連線對戰時對手會看到這個名字</div>
     <div class="card row-gap">
-      <input type="text" id="name-setup-input" class="code-input" style="text-transform:none; letter-spacing:normal; font-size:1.15rem;" placeholder="輸入你的暱稱" maxlength="12">
+      <input type="text" id="name-setup-input" class="code-input" style="text-transform:none; letter-spacing:normal; font-size:1.15rem;" placeholder="輸入你的暱稱" maxlength="12" autocomplete="off" autocorrect="off" spellcheck="false" name="wd-nickname" data-lpignore="true" data-1p-ignore="true">
       <button class="btn gold" id="btn-name-setup-confirm">儲存並繼續</button>
     </div>
   </div>
@@ -265,7 +330,7 @@
     </div>
     <div id="join-code-box" class="card hidden" style="margin-top:14px;">
       <div class="field-label">房間代碼</div>
-      <input class="code-input" id="join-code-input" maxlength="5" placeholder="AB12C">
+      <input class="code-input" id="join-code-input" maxlength="5" placeholder="AB12C" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" inputmode="text" name="wd-room-code" data-lpignore="true" data-1p-ignore="true">
       <button class="btn primary" id="btn-join-confirm" style="margin-top:14px;">加入</button>
       <div id="join-error" class="hint" style="color:var(--bad)"></div>
     </div>
@@ -346,12 +411,27 @@
     <div class="card">
       <div class="end-title">🎉 練習完成！</div>
       <div class="end-sub" id="practice-end-sub">答對 0 / 0 題</div>
-      <div class="end-stats">
-        <div class="end-stat"><b id="practice-end-accuracy">0%</b><span>正確率</span></div>
-      </div>
-      <button class="btn gold" id="btn-practice-again">再練習一次</button>
+      <div class="accuracy-track"><div class="accuracy-fill" id="practice-accuracy-fill"></div></div>
+      <div class="accuracy-label"><b id="practice-end-accuracy">0%</b> 正確率</div>
+      <button class="btn gold" id="btn-practice-again" style="margin-top:14px;">再練習一次</button>
       <button class="btn ghost" id="btn-practice-back-menu" style="border:1px solid var(--line); margin-top:10px;">回到主選單</button>
     </div>
+  </div>
+
+  <!-- ============ 勝利揭曉動畫 ============ -->
+  <div id="screen-reveal" class="hidden reveal-screen">
+    <div class="reveal-glow" id="reveal-glow"></div>
+    <div class="reveal-icon" id="reveal-icon">🏆</div>
+    <div class="reveal-title" id="reveal-title">獲勝！</div>
+    <div class="reveal-sub">正在結算戰績…</div>
+  </div>
+
+  <!-- ============ 延長賽提示動畫 ============ -->
+  <div id="screen-overtime" class="hidden reveal-screen">
+    <div class="reveal-glow" style="--glow-color:var(--warn);"></div>
+    <div class="reveal-icon">⚔️</div>
+    <div class="reveal-title">延長賽！</div>
+    <div class="reveal-sub">雙方都還沒被擊倒，題目補充中，繼續戰鬥到分出勝負！</div>
   </div>
 
   <!-- ============ 結算畫面 ============ -->
@@ -368,7 +448,7 @@
     </div>
   </div>
 
-  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-12-13（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
+  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-12-15（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
 </div>
 
 <!-- PeerJS：連線對戰用的 WebRTC 點對點直連函式庫 -->
@@ -2187,11 +2267,36 @@ let perLevelCounts = {};       // 選 2 個等級以上時，每個等級各自�
 let perLevelTouched = new Set(); // 玩家自己手動改過題數的等級，改選等級時不會覆蓋掉這些自訂值
 let lastLevelCounts = null;    // 記住上一場實際使用的等級/題數設定，供「再來一場」重複使用
 
+// ==========================================
+// 本機雙人對戰強制橫向：優先用瀏覽器的全螢幕＋方向鎖定 API（主要在 Android Chrome 有效，
+// 必須先進全螢幕才能鎖方向，這是瀏覽器的規定，不是我們能繞過的限制）。
+// 鎖不了的裝置（例如 iOS Safari、或沒有全螢幕權限的沙盒環境）就退而求其次，
+// 用 CSS 在偵測到直向時蓋一層「請將裝置橫放」的提示畫面代替。
+// ==========================================
+async function lockLandscapeForLocalMode(){
+  document.body.classList.add('force-landscape-mode');
+  try{
+    if(document.documentElement.requestFullscreen){
+      await document.documentElement.requestFullscreen().catch(()=>{});
+    }
+    if(screen.orientation && screen.orientation.lock){
+      await screen.orientation.lock('landscape').catch(()=>{});
+    }
+  }catch(e){ /* 鎖定失敗就交給 CSS 的旋轉提示畫面頂著，不影響遊戲本身 */ }
+}
+function unlockOrientation(){
+  document.body.classList.remove('force-landscape-mode');
+  try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
+  try{ if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{}); }catch(e){}
+}
+
 document.getElementById('btn-mode-local').onclick = ()=>{
   pendingFlow = { mode:'local' };
+  lockLandscapeForLocalMode();
   openLevelsScreen();
 };
 document.getElementById('btn-mode-practice').onclick = ()=>{
+  unlockOrientation();
   pendingFlow = { mode:'practice' };
   openLevelsScreen();
 };
@@ -2206,6 +2311,7 @@ document.getElementById('btn-mode-online').onclick = ()=>{
     alert('連線對戰的元件還沒載入完成，請確認網路連線正常後重新整理頁面再試一次。');
     return;
   }
+  unlockOrientation();
   document.getElementById('join-code-box').classList.add('hidden');
   document.getElementById('join-error').textContent = '';
   showScreen('screen-online-choice');
@@ -2226,6 +2332,7 @@ function openLevelsScreen(){
   syncPerLevelCounts();
   renderRoundCountArea();
   document.getElementById('levels-back').onclick = ()=>{
+    if(pendingFlow.mode !== 'local') unlockOrientation();
     showScreen(pendingFlow.mode === 'online-host' ? 'screen-online-choice' : 'screen-menu');
   };
   showScreen('screen-levels');
@@ -2563,11 +2670,21 @@ function localResolve(isCorrect, chosen, correctText){
 
 function localAdvanceRound(){
   LG.idx++;
-  if(LG.hp.p1 <= 0 || LG.hp.p2 <= 0 || LG.idx >= LG.deck.length){
+  if(LG.hp.p1 <= 0 || LG.hp.p2 <= 0){
     endLocalGame();
+  } else if(LG.idx >= LG.deck.length){
+    localEnterOvertime();
   } else {
     startLocalRound();
   }
+}
+
+// 題目出完了，但雙方都還沒被擊倒：補一批同樣設定的題目，進延長賽繼續打到分出勝負
+function localEnterOvertime(){
+  localClearTimers();
+  const extra = buildDeck(lastLevelCounts || {1:12});
+  LG.deck = LG.deck.concat(extra);
+  showOvertimeBanner(()=> startLocalRound());
 }
 
 function endLocalGame(){
@@ -2576,23 +2693,50 @@ function endLocalGame(){
   renderEndScreen(winner, '玩家一', '玩家二', LG.score.p1, LG.score.p2, LG.hp, LG.maxHp);
 }
 
+// 揭曉動畫：先顯示「誰贏了」的短動畫，播完才進入正式結算畫面
+function showWinnerReveal(winner, name1, name2, onDone){
+  const glow = document.getElementById('reveal-glow');
+  const icon = document.getElementById('reveal-icon');
+  const title = document.getElementById('reveal-title');
+  let color, text, emoji;
+  if(winner === 'draw'){ color = 'var(--gold)'; text = '平手！'; emoji = '🤝'; }
+  else if(winner === 'p1'){ color = 'var(--p1)'; text = name1 + ' 獲勝！'; emoji = '🏆'; }
+  else { color = 'var(--p2)'; text = name2 + ' 獲勝！'; emoji = '🏆'; }
+  glow.style.setProperty('--glow-color', color);
+  icon.textContent = emoji;
+  title.textContent = text;
+  showScreen('screen-reveal');
+  setTimeout(onDone, 1800);
+}
+
+// 延長賽提示：題目出完但雙方都還沒倒下時，先補題目、播一段提示動畫，再繼續對戰
+function showOvertimeBanner(onDone){
+  showScreen('screen-overtime');
+  setTimeout(()=>{
+    showScreen('screen-battle');
+    onDone();
+  }, 1500);
+}
+
 function renderEndScreen(winner, name1, name2, score1, score2, hp, maxHp){
-  const title = document.getElementById('end-title');
-  const sub = document.getElementById('end-sub');
-  const cap = maxHp || 100;
-  if(winner === 'draw'){
-    title.textContent = '🤝 平手！';
-    sub.textContent = '雙方勢均力敵';
-  } else {
-    const wName = winner === 'p1' ? name1 : name2;
-    title.textContent = '🏆 ' + wName + ' 獲勝！';
-    sub.textContent = `HP 剩餘 ${Math.max(0,hp.p1)} : ${Math.max(0,hp.p2)}（滿血 ${cap}）`;
-  }
-  document.getElementById('end-p1-score').textContent = score1;
-  document.getElementById('end-p2-score').textContent = score2;
-  document.getElementById('end-p1-label').textContent = name1 + '得分';
-  document.getElementById('end-p2-label').textContent = name2 + '得分';
-  showScreen('screen-end');
+  showWinnerReveal(winner, name1, name2, ()=>{
+    const title = document.getElementById('end-title');
+    const sub = document.getElementById('end-sub');
+    const cap = maxHp || 100;
+    if(winner === 'draw'){
+      title.textContent = '🤝 平手！';
+      sub.textContent = '雙方勢均力敵';
+    } else {
+      const wName = winner === 'p1' ? name1 : name2;
+      title.textContent = '🏆 ' + wName + ' 獲勝！';
+      sub.textContent = `HP 剩餘 ${Math.max(0,hp.p1)} : ${Math.max(0,hp.p2)}（滿血 ${cap}）`;
+    }
+    document.getElementById('end-p1-score').textContent = score1;
+    document.getElementById('end-p2-score').textContent = score2;
+    document.getElementById('end-p1-label').textContent = name1 + '得分';
+    document.getElementById('end-p2-label').textContent = name2 + '得分';
+    showScreen('screen-end');
+  });
 }
 
 document.getElementById('btn-play-again').onclick = ()=>{
@@ -2606,7 +2750,7 @@ document.getElementById('btn-play-again').onclick = ()=>{
     showScreen('screen-menu');
   }
 };
-document.getElementById('btn-back-menu').onclick = ()=> showScreen('screen-menu');
+document.getElementById('btn-back-menu').onclick = ()=>{ unlockOrientation(); showScreen('screen-menu'); };
 
 // ==========================================
 // 個人練習（沒有對手，不計時，答完顯示正確率）
@@ -2673,6 +2817,16 @@ function endPracticeSession(){
   document.getElementById('practice-end-sub').textContent = `答對 ${correct} / ${total} 題`;
   document.getElementById('practice-end-accuracy').textContent = pct + '%';
   showScreen('screen-practice-end');
+
+  const fill = document.getElementById('practice-accuracy-fill');
+  fill.style.width = '0%';
+  // 先歸零、等瀏覽器畫完這一幀，下一幀再設定成目標百分比，
+  // 這樣 CSS transition 才會真的「跑」過去，而不是直接跳到結果。
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      fill.style.width = pct + '%';
+    });
+  });
 }
 
 document.getElementById('btn-practice-again').onclick = ()=>{
@@ -2828,6 +2982,10 @@ function guestHandleMessage(msg){
       ONLINE.round.expired = true;
       onlineRenderFromState();
       break;
+    case 'overtime':
+      ONLINE.deck = ONLINE.deck.concat(msg.extraDeck);
+      showOvertimeBanner(()=>{}); // 玩家二不主導出題，只需要跟房主一起看動畫、等房主送下一題
+      break;
     case 'game-over':
       ONLINE.hp = msg.hp; ONLINE.score = msg.score;
       if(onlineTickHandle) clearInterval(onlineTickHandle);
@@ -2898,11 +3056,23 @@ function hostResolveRound(resolvedBy, isCorrect, chosen){
 
 function hostAdvanceRound(){
   ONLINE.idx++;
-  if(ONLINE.hp.p1 <= 0 || ONLINE.hp.p2 <= 0 || ONLINE.idx >= ONLINE.deck.length){
+  if(ONLINE.hp.p1 <= 0 || ONLINE.hp.p2 <= 0){
     hostEndGame();
+  } else if(ONLINE.idx >= ONLINE.deck.length){
+    hostEnterOvertime();
   } else {
     hostStartRound();
   }
+}
+
+// 題目出完了但雙方都還沒被擊倒：補一批同樣設定的題目給雙方（保持牌組一致），
+// 播延長賽提示動畫，播完後繼續出題
+function hostEnterOvertime(){
+  clearTimeout(hostRoundTimeout);
+  const extra = buildDeck(lastLevelCounts || {1:12});
+  ONLINE.deck = ONLINE.deck.concat(extra);
+  sendToPeer(msgOf('overtime', { extraDeck: extra }));
+  showOvertimeBanner(()=> hostStartRound());
 }
 
 function hostEndGame(){
