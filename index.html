@@ -273,20 +273,6 @@
   }
 
   .footer-note{ margin-top:auto; padding-top:18px; color:var(--sub); font-size:clamp(.62rem,2cqw,.72rem); text-align:center; }
-
-  /* 本機雙人對戰的強制橫向：不依賴容易在部分裝置上出狀況的全螢幕/方向鎖定 API，
-     改用純 CSS 把整個畫面旋轉 90 度，讓內容「看起來」是橫的——手機還是直的，
-     但畫面內容已經是橫向排版，玩家自己把手機轉橫拿著看就對了。
-     只有偵測到目前視窗仍是直向（orientation: portrait）時才套用旋轉；
-     如果玩家已經自己把手機轉成橫向，視窗本身就是橫的，就不會再套用、直接正常顯示。 */
-  body.force-landscape-mode{ overflow:hidden; }
-  @media (orientation: portrait){
-    body.force-landscape-mode .app{
-      position:fixed; top:0; left:100%;
-      width:100vh; height:100vw; max-width:none; min-height:0;
-      margin:0; transform-origin:0 0; transform:rotate(90deg);
-    }
-  }
 </style>
 </head>
 <body>
@@ -445,7 +431,7 @@
     </div>
   </div>
 
-  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-16-01（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
+  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-16-03（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
 </div>
 
 <!-- PeerJS：連線對戰用的 WebRTC 點對點直連函式庫 -->
@@ -2264,21 +2250,11 @@ let perLevelCounts = {};       // 選 2 個等級以上時，每個等級各自�
 let perLevelTouched = new Set(); // 玩家自己手動改過題數的等級，改選等級時不會覆蓋掉這些自訂值
 let lastLevelCounts = null;    // 記住上一場實際使用的等級/題數設定，供「再來一場」重複使用
 
-// ==========================================
-// 本機雙人對戰強制橫向：純 CSS 把畫面旋轉 90 度呈現橫向排版（見上面 <style> 裡的說明），
-// 不使用全螢幕／方向鎖定 API——那套 API 在部分裝置上實測會有全螢幕跳來跳去、
-// 鎖定失敗等奇怪狀況，改用單純的 CSS 旋轉更穩定，玩家自己把手機轉橫拿著看就好。
-// 只在真正進入對戰畫面時才套用，選題目、選等級的畫面維持原本直向。
-// ==========================================
-function enableForcedLandscape(){ document.body.classList.add('force-landscape-mode'); }
-function unlockOrientation(){ document.body.classList.remove('force-landscape-mode'); }
-
 document.getElementById('btn-mode-local').onclick = ()=>{
   pendingFlow = { mode:'local' };
   openLevelsScreen();
 };
 document.getElementById('btn-mode-practice').onclick = ()=>{
-  unlockOrientation();
   pendingFlow = { mode:'practice' };
   openLevelsScreen();
 };
@@ -2293,7 +2269,6 @@ document.getElementById('btn-mode-online').onclick = ()=>{
     alert('連線對戰的元件還沒載入完成，請確認網路連線正常後重新整理頁面再試一次。');
     return;
   }
-  unlockOrientation();
   document.getElementById('join-code-box').classList.add('hidden');
   document.getElementById('join-error').textContent = '';
   showScreen('screen-online-choice');
@@ -2314,7 +2289,6 @@ function openLevelsScreen(){
   syncPerLevelCounts();
   renderRoundCountArea();
   document.getElementById('levels-back').onclick = ()=>{
-    unlockOrientation();
     showScreen(pendingFlow.mode === 'online-host' ? 'screen-online-choice' : 'screen-menu');
   };
   showScreen('screen-levels');
@@ -2521,7 +2495,6 @@ function startLocalGame(levelCounts){
   document.getElementById('p1-name').textContent = '玩家一 (A)';
   document.getElementById('p2-name').textContent = '玩家二 (B)';
 
-  enableForcedLandscape();
   showScreen('screen-battle');
   startLocalRound();
 }
@@ -2726,14 +2699,15 @@ document.getElementById('btn-play-again').onclick = ()=>{
   if(MY_ROLE === 'p1'){
     onlineHostPlayAgain();
   } else if(MY_ROLE === 'p2'){
-    alert('連線對戰的「再來一場」要由房主那邊按下才會開始，請留在這個畫面等待對手動作。');
+    const hostLabel = (hostDisplayName && hostDisplayName !== '房主') ? `${hostDisplayName}（房主）` : '房主';
+    alert(`連線對戰的「再來一場」要由 ${hostLabel} 那邊按下才會開始，請留在這個畫面等待對手動作。`);
   } else if(lastLevelCounts){
     startLocalGame(lastLevelCounts);
   } else {
     showScreen('screen-menu');
   }
 };
-document.getElementById('btn-back-menu').onclick = ()=>{ unlockOrientation(); showScreen('screen-menu'); };
+document.getElementById('btn-back-menu').onclick = ()=> showScreen('screen-menu');
 
 // ==========================================
 // 個人練習（沒有對手，不計時，答完顯示正確率）
@@ -2942,7 +2916,9 @@ document.getElementById('btn-join-confirm').onclick = ()=>{
 function guestHandleMessage(msg){
   switch(msg.type){
     case 'init':
-      hostDisplayName = (msg.hostName || '').slice(0,12) || '房主';
+      // 只有在對方真的有送名字時才覆蓋，避免「再來一場」等情況下把已知的房主名字洗成預設值
+      if(msg.hostName) hostDisplayName = String(msg.hostName).slice(0,12);
+      if(!hostDisplayName) hostDisplayName = '房主';
       ONLINE = { deck: msg.deck, maxHp: msg.maxHp, totalRounds: msg.totalRounds, idx:0,
                  hp:{p1:msg.maxHp, p2:msg.maxHp}, score:{p1:0,p2:0}, round:null };
       enterOnlineBattle();
@@ -3079,7 +3055,7 @@ function onlineHostPlayAgain(){
   const deck = buildDeck(lastLevelCounts || {1:12});
   const hp0 = computeStartHP(deck);
   ONLINE = { deck, maxHp:hp0, totalRounds: deck.length, idx:0, hp:{p1:hp0,p2:hp0}, score:{p1:0,p2:0}, round:null };
-  sendToPeer(msgOf('init', { deck: ONLINE.deck, maxHp: ONLINE.maxHp, totalRounds: ONLINE.totalRounds }));
+  sendToPeer(msgOf('init', { deck: ONLINE.deck, maxHp: ONLINE.maxHp, totalRounds: ONLINE.totalRounds, hostName: hostDisplayName }));
   enterOnlineBattle();
   hostStartRound();
 }
