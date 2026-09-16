@@ -41,27 +41,37 @@
     --fs-level-chip: clamp(.82rem, 3.4cqw, 1.05rem);
     --pad-card: clamp(14px, 3.6cqw, 30px);
     --pad-app: clamp(10px, 3.2cqw, 24px);
-    --gap-option: clamp(8px, 1.6vh, 14px);
-    --h-option: clamp(52px, 8.5vh, 78px);
+    --gap-option: clamp(8px, 1.6dvh, 14px);
+    --h-option: clamp(52px, 8.5dvh, 78px);
     --app-max-w: min(94vw, 860px);
   }
   * { box-sizing:border-box; }
-  html,body{ height:100%; }
+  /* 用 min-height 而不是固定 height，內容超過一個螢幕時頁面才能正常往下捲；
+     原本寫死 height:100% 會讓超出的內容被卡住、捲不到下面的按鈕。
+     dvh 會跟著手機瀏覽器網址列的伸縮調整，比 vh 更準確（不支援的舊瀏覽器自動用上面那行 vh 值）。 */
+  html{ min-height:100%; }
   body{
     margin:0;
+    min-height:100vh;
+    min-height:100dvh;
     background:
       radial-gradient(1100px 600px at 20% -10%, #1a2035 0%, transparent 60%),
       radial-gradient(1100px 600px at 100% 110%, #241419 0%, transparent 60%),
       var(--bg);
+    background-attachment:fixed;
     color:var(--ink);
     font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",-apple-system,BlinkMacSystemFont,sans-serif;
     display:flex;
     justify-content:center;
-    min-height:100vh;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
   }
   .app{
     width:100%; max-width:var(--app-max-w); padding:var(--pad-app);
-    display:flex; flex-direction:column; min-height:100vh;
+    display:flex; flex-direction:column;
+    min-height:100vh;
+    min-height:100dvh;
+    padding-bottom:calc(var(--pad-app) + env(safe-area-inset-bottom, 0px));
     container-type:inline-size; container-name:appbox;
   }
   /* 若瀏覽器不支援 CSS Container Query（極少數舊版），退回用視窗寬度 vw 計算，仍保有流動縮放效果 */
@@ -87,7 +97,7 @@
     display:flex; align-items:center; gap:10px;
   }
   h1.brand .sword{ filter:drop-shadow(0 0 6px var(--gold)); }
-  .tagline{ color:var(--sub); font-size:var(--fs-tagline); margin-bottom:clamp(14px,3vh,22px); }
+  .tagline{ color:var(--sub); font-size:var(--fs-tagline); margin-bottom:clamp(14px,3dvh,22px); }
 
   .card{
     background:linear-gradient(180deg, var(--panel), var(--panel-2));
@@ -98,7 +108,7 @@
   }
 
   .btn{
-    display:block; width:100%; text-align:center; padding:clamp(12px,2.6vh,17px) 16px;
+    display:block; width:100%; text-align:center; padding:clamp(12px,2.6dvh,17px) 16px;
     border-radius:14px; border:1px solid var(--line); background:var(--panel-2);
     color:var(--ink); font-size:var(--fs-body); font-weight:700; cursor:pointer;
     transition:transform .12s ease, border-color .2s ease, background .2s ease;
@@ -115,7 +125,7 @@
 
   .field-label{ font-size:var(--fs-tagline); color:var(--sub); margin:14px 0 8px; font-weight:600; }
   .code-input{
-    width:100%; padding:clamp(12px,3vh,18px); font-size:clamp(1.2rem,6cqw,1.7rem); letter-spacing:.3em; text-align:center;
+    width:100%; padding:clamp(12px,3dvh,18px); font-size:clamp(1.2rem,6cqw,1.7rem); letter-spacing:.3em; text-align:center;
     text-transform:uppercase; border-radius:12px; border:1px solid var(--line);
     background:var(--panel); color:var(--ink); font-weight:800;
   }
@@ -123,7 +133,7 @@
 
   .level-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
   .level-chip{
-    border:2px solid var(--line); border-radius:12px; padding:clamp(9px,2.2vh,14px) 6px; text-align:center;
+    border:2px solid var(--line); border-radius:12px; padding:clamp(9px,2.2dvh,14px) 6px; text-align:center;
     cursor:pointer; background:var(--panel); font-weight:700; color:var(--sub); font-size:var(--fs-level-chip);
     transition:all .15s ease;
   }
@@ -146,7 +156,7 @@
   .fighter{ flex:1; }
   .fighter-name{ font-size:clamp(.7rem,2.6cqw,.85rem); font-weight:700; display:flex; justify-content:space-between; margin-bottom:5px; }
   .fighter-name .tag{ color:var(--sub); font-weight:500; }
-  .hp-track{ height:clamp(10px,1.8vh,15px); border-radius:8px; background:#000; border:1px solid var(--line); overflow:hidden; position:relative; }
+  .hp-track{ height:clamp(10px,1.8dvh,15px); border-radius:8px; background:#000; border:1px solid var(--line); overflow:hidden; position:relative; }
   .hp-fill{ height:100%; border-radius:8px; transition:width .45s cubic-bezier(.2,.8,.2,1); }
   .hp-fill.p1{ background:linear-gradient(90deg,var(--p1),#79a4ff); }
   .hp-fill.p2{ background:linear-gradient(90deg,#79a4ff,var(--p2)); }
@@ -162,21 +172,21 @@
   .round-timer-fill{ height:100%; background:var(--warn); width:100%; transition:width .1s linear; }
 
   .word-stage{
-    text-align:center; padding:clamp(14px,3.4vh,28px) 10px clamp(12px,2.6vh,22px); position:relative;
+    text-align:center; padding:clamp(14px,3.4dvh,28px) 10px clamp(12px,2.6dvh,22px); position:relative;
   }
   .word-stage .level-tag{
     display:inline-block; font-size:clamp(.65rem,2.4cqw,.78rem); font-weight:800; padding:3px 10px; border-radius:20px;
     background:var(--chip-bg); color:#fff; margin-bottom:10px; letter-spacing:.05em;
   }
   #word-display, #practice-word-display{ font-size:var(--fs-word); font-weight:900; word-break:break-word; line-height:1.2; }
-  .buzz-status{ min-height:clamp(20px,3.4vh,28px); font-weight:800; margin-top:8px; font-size:clamp(.8rem,3cqw,1rem); }
+  .buzz-status{ min-height:clamp(20px,3.4dvh,28px); font-weight:800; margin-top:8px; font-size:clamp(.8rem,3cqw,1rem); }
   .buzz-status.p1{ color:var(--p1); }
   .buzz-status.p2{ color:var(--p2); }
   .buzz-status.warn{ color:var(--warn); }
 
   .options-grid{ display:flex; flex-direction:column; gap:var(--gap-option); margin:8px 0 18px; }
   .option-btn{
-    background:var(--panel); border:2px solid var(--line); padding:clamp(11px,2.4vh,16px) 14px; border-radius:12px;
+    background:var(--panel); border:2px solid var(--line); padding:clamp(11px,2.4dvh,16px) 14px; border-radius:12px;
     font-size:var(--fs-option); color:var(--ink); text-align:left; cursor:pointer; font-weight:600;
     transition:all .15s ease;
   }
@@ -240,7 +250,7 @@
   /* 勝利揭曉動畫 / 延長賽提示（共用同一套動畫樣式） */
   .reveal-screen{
     position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    flex:1; text-align:center; overflow:hidden; min-height:60vh;
+    flex:1; text-align:center; overflow:hidden; min-height:60dvh;
   }
   .reveal-glow{
     position:absolute; inset:-20%; border-radius:50%;
@@ -273,6 +283,11 @@
   }
 
   .footer-note{ margin-top:auto; padding-top:18px; color:var(--sub); font-size:clamp(.62rem,2cqw,.72rem); text-align:center; }
+
+  /* 內容較多時（例如選了很多等級、或選項數量多）不要把畫面撐爆導致按鈕按不到，
+     flex 子元素預設不會縮到比內容小，加上 min-height:0 才能正確讓出空間並捲動。 */
+  .app > div[id^="screen-"]{ min-height:0; }
+  .options-grid{ min-height:0; }
 </style>
 </head>
 <body>
@@ -431,7 +446,7 @@
     </div>
   </div>
 
-  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-16-03（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
+  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-16-04（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
 </div>
 
 <!-- PeerJS：連線對戰用的 WebRTC 點對點直連函式庫 -->
