@@ -274,25 +274,22 @@
 
   .footer-note{ margin-top:auto; padding-top:18px; color:var(--sub); font-size:clamp(.62rem,2cqw,.72rem); text-align:center; }
 
-  /* 本機雙人對戰的強制橫向：能鎖定的裝置由 JS 處理，鎖不了的（例如 iOS）就顯示這個提示畫面代替 */
-  #rotate-hint{
-    display:none; position:fixed; inset:0; z-index:9999; background:var(--bg);
-    flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px; color:var(--ink);
-  }
+  /* 本機雙人對戰的強制橫向：不依賴容易在部分裝置上出狀況的全螢幕/方向鎖定 API，
+     改用純 CSS 把整個畫面旋轉 90 度，讓內容「看起來」是橫的——手機還是直的，
+     但畫面內容已經是橫向排版，玩家自己把手機轉橫拿著看就對了。
+     只有偵測到目前視窗仍是直向（orientation: portrait）時才套用旋轉；
+     如果玩家已經自己把手機轉成橫向，視窗本身就是橫的，就不會再套用、直接正常顯示。 */
+  body.force-landscape-mode{ overflow:hidden; }
   @media (orientation: portrait){
-    body.force-landscape-mode #rotate-hint{ display:flex; }
-    body.force-landscape-mode .app{ display:none; }
+    body.force-landscape-mode .app{
+      position:fixed; top:0; left:100%;
+      width:100vh; height:100vw; max-width:none; min-height:0;
+      margin:0; transform-origin:0 0; transform:rotate(90deg);
+    }
   }
 </style>
 </head>
 <body>
-<!-- 部分瀏覽器（例如 iOS Safari、或缺少全螢幕權限的環境）沒辦法用程式強制轉橫向，
-     這種情況下改用這個提示畫面請玩家自己把裝置轉橫，只有本機雙人對戰會用到。 -->
-<div id="rotate-hint">
-  <div style="font-size:3rem; margin-bottom:12px;">📱↻</div>
-  <div style="font-size:1.1rem; font-weight:700;">請將裝置橫向放置</div>
-  <div class="hint" style="margin-top:8px; max-width:280px;">本機雙人對戰建議橫式操作，兩人比較好同時搶答</div>
-</div>
 <div class="app">
 
   <!-- ============ 選單畫面 ============ -->
@@ -448,7 +445,7 @@
     </div>
   </div>
 
-  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-12-15（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
+  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-16-01（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
 </div>
 
 <!-- PeerJS：連線對戰用的 WebRTC 點對點直連函式庫 -->
@@ -2268,31 +2265,16 @@ let perLevelTouched = new Set(); // 玩家自己手動改過題數的等級，�
 let lastLevelCounts = null;    // 記住上一場實際使用的等級/題數設定，供「再來一場」重複使用
 
 // ==========================================
-// 本機雙人對戰強制橫向：優先用瀏覽器的全螢幕＋方向鎖定 API（主要在 Android Chrome 有效，
-// 必須先進全螢幕才能鎖方向，這是瀏覽器的規定，不是我們能繞過的限制）。
-// 鎖不了的裝置（例如 iOS Safari、或沒有全螢幕權限的沙盒環境）就退而求其次，
-// 用 CSS 在偵測到直向時蓋一層「請將裝置橫放」的提示畫面代替。
+// 本機雙人對戰強制橫向：純 CSS 把畫面旋轉 90 度呈現橫向排版（見上面 <style> 裡的說明），
+// 不使用全螢幕／方向鎖定 API——那套 API 在部分裝置上實測會有全螢幕跳來跳去、
+// 鎖定失敗等奇怪狀況，改用單純的 CSS 旋轉更穩定，玩家自己把手機轉橫拿著看就好。
+// 只在真正進入對戰畫面時才套用，選題目、選等級的畫面維持原本直向。
 // ==========================================
-async function lockLandscapeForLocalMode(){
-  document.body.classList.add('force-landscape-mode');
-  try{
-    if(document.documentElement.requestFullscreen){
-      await document.documentElement.requestFullscreen().catch(()=>{});
-    }
-    if(screen.orientation && screen.orientation.lock){
-      await screen.orientation.lock('landscape').catch(()=>{});
-    }
-  }catch(e){ /* 鎖定失敗就交給 CSS 的旋轉提示畫面頂著，不影響遊戲本身 */ }
-}
-function unlockOrientation(){
-  document.body.classList.remove('force-landscape-mode');
-  try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
-  try{ if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{}); }catch(e){}
-}
+function enableForcedLandscape(){ document.body.classList.add('force-landscape-mode'); }
+function unlockOrientation(){ document.body.classList.remove('force-landscape-mode'); }
 
 document.getElementById('btn-mode-local').onclick = ()=>{
   pendingFlow = { mode:'local' };
-  lockLandscapeForLocalMode();
   openLevelsScreen();
 };
 document.getElementById('btn-mode-practice').onclick = ()=>{
@@ -2332,7 +2314,7 @@ function openLevelsScreen(){
   syncPerLevelCounts();
   renderRoundCountArea();
   document.getElementById('levels-back').onclick = ()=>{
-    if(pendingFlow.mode !== 'local') unlockOrientation();
+    unlockOrientation();
     showScreen(pendingFlow.mode === 'online-host' ? 'screen-online-choice' : 'screen-menu');
   };
   showScreen('screen-levels');
@@ -2539,6 +2521,7 @@ function startLocalGame(levelCounts){
   document.getElementById('p1-name').textContent = '玩家一 (A)';
   document.getElementById('p2-name').textContent = '玩家二 (B)';
 
+  enableForcedLandscape();
   showScreen('screen-battle');
   startLocalRound();
 }
