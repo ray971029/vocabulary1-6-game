@@ -156,7 +156,12 @@
   .fighter{ flex:1; }
   .fighter-name{ font-size:clamp(.7rem,2.6cqw,.85rem); font-weight:700; display:flex; justify-content:space-between; margin-bottom:5px; }
   .fighter-name .tag{ color:var(--sub); font-weight:500; }
-  .hp-track{ height:clamp(10px,1.8dvh,15px); border-radius:8px; background:#000; border:1px solid var(--line); overflow:hidden; position:relative; }
+  .hp-track{ height:clamp(16px,2.6dvh,20px); border-radius:8px; background:#000; border:1px solid var(--line); overflow:hidden; position:relative; }
+  .hp-num{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:clamp(.6rem,2.2cqw,.72rem); font-weight:800; color:#fff; letter-spacing:.02em;
+    text-shadow:0 1px 3px rgba(0,0,0,.9), 0 0 2px rgba(0,0,0,.7); pointer-events:none;
+  }
   .hp-fill{ height:100%; border-radius:8px; transition:width .45s cubic-bezier(.2,.8,.2,1); }
   .hp-fill.p1{ background:linear-gradient(90deg,var(--p1),#79a4ff); }
   .hp-fill.p2{ background:linear-gradient(90deg,#79a4ff,var(--p2)); }
@@ -204,10 +209,10 @@
     display:flex; align-items:flex-start; justify-content:flex-start; transition:background .12s ease;
     touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent;
   }
-  .option-btn.split .zone.a{ background:rgba(61,123,255,.08); justify-content:flex-start; }
-  .option-btn.split .zone.b{ background:rgba(255,77,94,.08); justify-content:flex-end; }
-  .option-btn.split .zone.a:active:not(:disabled){ background:rgba(61,123,255,.3); }
-  .option-btn.split .zone.b:active:not(:disabled){ background:rgba(255,77,94,.3); }
+  .option-btn.split .zone.a{ background:rgba(61,123,255,.22); justify-content:flex-start; }
+  .option-btn.split .zone.b{ background:rgba(255,77,94,.20); justify-content:flex-end; }
+  .option-btn.split .zone.a:active:not(:disabled){ background:rgba(61,123,255,.45); }
+  .option-btn.split .zone.b:active:not(:disabled){ background:rgba(255,77,94,.42); }
   .option-btn.split .zone:disabled{ cursor:default; }
   .option-btn.split .zone-tag{
     font-size:.65rem; font-weight:800; opacity:.55; padding:6px 9px; color:var(--ink);
@@ -280,6 +285,18 @@
   @keyframes revealGlowPulse{
     0%,100%{ transform:scale(.9); opacity:.25; }
     50%{ transform:scale(1.15); opacity:.5; }
+  }
+
+  /* 對戰開始倒數 3-2-1 */
+  .countdown-num{
+    font-size:clamp(4rem, 22cqw, 7rem); font-weight:900; color:#fff; position:relative;
+    text-shadow:0 4px 18px rgba(0,0,0,.5);
+  }
+  .countdown-num.pop{ animation:countdownPop .7s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes countdownPop{
+    0%{ transform:scale(.3); opacity:0; }
+    50%{ transform:scale(1.15); opacity:1; }
+    100%{ transform:scale(1); opacity:1; }
   }
 
   .footer-note{ margin-top:auto; padding-top:18px; color:var(--sub); font-size:clamp(.62rem,2cqw,.72rem); text-align:center; }
@@ -367,12 +384,12 @@
     <div class="arena-header">
       <div class="fighter left">
         <div class="fighter-name"><span id="p1-name">玩家一</span><span class="tag" id="p1-score">0</span></div>
-        <div class="hp-track"><div class="hp-fill p1" id="p1-hp" style="width:100%"></div></div>
+        <div class="hp-track"><div class="hp-fill p1" id="p1-hp" style="width:100%"></div><span class="hp-num" id="p1-hp-num">100</span></div>
       </div>
       <div class="vs-badge">VS</div>
       <div class="fighter right">
         <div class="fighter-name"><span id="p2-name">玩家二</span><span class="tag" id="p2-score">0</span></div>
-        <div class="hp-track"><div class="hp-fill p2" id="p2-hp" style="width:100%"></div></div>
+        <div class="hp-track"><div class="hp-fill p2" id="p2-hp" style="width:100%"></div><span class="hp-num" id="p2-hp-num">100</span></div>
       </div>
     </div>
 
@@ -416,6 +433,12 @@
     </div>
   </div>
 
+  <!-- ============ 對戰開始倒數 ============ -->
+  <div id="screen-countdown" class="hidden reveal-screen">
+    <div class="reveal-glow" style="--glow-color:var(--gold);"></div>
+    <div class="countdown-num" id="countdown-num">3</div>
+  </div>
+
   <!-- ============ 勝利揭曉動畫 ============ -->
   <div id="screen-reveal" class="hidden reveal-screen">
     <div class="reveal-glow" id="reveal-glow"></div>
@@ -446,7 +469,7 @@
     </div>
   </div>
 
-  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-16-04（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
+  <div class="footer-note">Lv.1 基礎 · Lv.2 初級 · Lv.3 中級 · Lv.4 中高 · Lv.5 高級 · Lv.6 終極<br>build 2026-09-17-03（如果畫面跟這個版號對不上，代表還在讀舊快取）</div>
 </div>
 
 <!-- PeerJS：連線對戰用的 WebRTC 點對點直連函式庫 -->
@@ -2073,7 +2096,7 @@ const LEVEL_META = {
   2:{name:'初級', color:'#8e44ad'},
   3:{name:'中級', color:'#d35400'},
   4:{name:'中高', color:'#c0392b'},
-  5:{name:'高級', color:'#28389e'},
+  5:{name:'高級', color:'#4a63e8'},
   6:{name:'終極', color:'#b8962e'},
 };
 const BUZZ_WINDOW = 8000;
@@ -2111,6 +2134,52 @@ function determineWinner(hp, score){
   if(hp.p1 !== hp.p2) return hp.p1 > hp.p2 ? 'p1' : 'p2';
   if(score.p1 !== score.p2) return score.p1 > score.p2 ? 'p1' : 'p2';
   return 'draw';
+}
+
+// HP 數字用「跳動」動畫從目前顯示的數字滾到新數字，而不是瞬間換掉，
+// 扣血/回合開始時看起來更有動態感。目前值跟目標值一樣就直接跳過，不做無意義的動畫。
+const hpNumAnimFrames = {};
+function animateHpNumber(elId, toValue){
+  const el = document.getElementById(elId);
+  const fromValue = parseInt(el.textContent, 10);
+  if(isNaN(fromValue) || fromValue === toValue){ el.textContent = toValue; return; }
+  if(hpNumAnimFrames[elId]) cancelAnimationFrame(hpNumAnimFrames[elId]);
+  const duration = 550;
+  const start = performance.now();
+  function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+  function tick(now){
+    const t = Math.min(1, (now - start) / duration);
+    const eased = easeOutCubic(t);
+    el.textContent = Math.round(fromValue + (toValue - fromValue) * eased);
+    if(t < 1){
+      hpNumAnimFrames[elId] = requestAnimationFrame(tick);
+    } else {
+      el.textContent = toValue;
+      delete hpNumAnimFrames[elId];
+    }
+  }
+  hpNumAnimFrames[elId] = requestAnimationFrame(tick);
+}
+
+// 對戰開始前的 3-2-1 倒數動畫，每個數字都停留一小段時間、故意不要跑太快，增加開賽的儀式感。
+function showCountdown(onDone){
+  const el = document.getElementById('countdown-num');
+  showScreen('screen-countdown');
+  const sequence = ['3', '2', '1', '開始！'];
+  let i = 0;
+  function step(){
+    el.textContent = sequence[i];
+    el.classList.remove('pop');
+    void el.offsetWidth; // 強制觸發 reflow，讓同一個元素能重新播放同一段 CSS 動畫
+    el.classList.add('pop');
+    i++;
+    if(i < sequence.length){
+      setTimeout(step, 800);
+    } else {
+      setTimeout(onDone, 700);
+    }
+  }
+  step();
 }
 
 // 依實際牌組（題數 × 該牌組平均傷害）動態計算雙方初始 HP，
@@ -2509,9 +2578,13 @@ function startLocalGame(levelCounts){
   };
   document.getElementById('p1-name').textContent = '玩家一 (A)';
   document.getElementById('p2-name').textContent = '玩家二 (B)';
+  document.getElementById('p1-hp-num').textContent = hp0;
+  document.getElementById('p2-hp-num').textContent = hp0;
 
-  showScreen('screen-battle');
-  startLocalRound();
+  showCountdown(()=>{
+    showScreen('screen-battle');
+    startLocalRound();
+  });
 }
 
 function localClearTimers(){
@@ -2537,6 +2610,8 @@ function localRunTimerBar(durationMs, onExpire){
 function localRenderHpScore(){
   document.getElementById('p1-hp').style.width = Math.max(0, LG.hp.p1/LG.maxHp*100) + '%';
   document.getElementById('p2-hp').style.width = Math.max(0, LG.hp.p2/LG.maxHp*100) + '%';
+  animateHpNumber('p1-hp-num', Math.max(0, LG.hp.p1));
+  animateHpNumber('p2-hp-num', Math.max(0, LG.hp.p2));
   document.getElementById('p1-score').textContent = LG.score.p1;
   document.getElementById('p2-score').textContent = LG.score.p2;
 }
@@ -2677,7 +2752,7 @@ function showWinnerReveal(winner, name1, name2, onDone){
   icon.textContent = emoji;
   title.textContent = text;
   showScreen('screen-reveal');
-  setTimeout(onDone, 1800);
+  setTimeout(onDone, 2800);
 }
 
 // 延長賽提示：題目出完但雙方都還沒倒下時，先補題目、播一段提示動畫，再繼續對戰
@@ -2787,18 +2862,38 @@ function endPracticeSession(){
   const correct = PG.correct;
   const pct = total > 0 ? Math.round((correct/total)*100) : 0;
   document.getElementById('practice-end-sub').textContent = `答對 ${correct} / ${total} 題`;
-  document.getElementById('practice-end-accuracy').textContent = pct + '%';
   showScreen('screen-practice-end');
+  animateAccuracyBar(pct);
+}
 
+// 橫條跟數字一起用 JS 逐幀跑動畫（不是單純的 CSS transition），
+// 用 ease-out-quart 這種「先快後慢」的曲線，越接近目標百分比動畫越慢，更有到底的感覺。
+function animateAccuracyBar(pct){
   const fill = document.getElementById('practice-accuracy-fill');
+  const label = document.getElementById('practice-end-accuracy');
+  const duration = 2400;
+  fill.style.transition = 'none';
   fill.style.width = '0%';
-  // 先歸零、等瀏覽器畫完這一幀，下一幀再設定成目標百分比，
-  // 這樣 CSS transition 才會真的「跑」過去，而不是直接跳到結果。
-  requestAnimationFrame(()=>{
-    requestAnimationFrame(()=>{
+  label.textContent = '0%';
+
+  function easeOutQuart(t){ return 1 - Math.pow(1 - t, 4); }
+
+  const start = performance.now();
+  function tick(now){
+    const elapsed = now - start;
+    const t = Math.min(1, elapsed / duration);
+    const eased = easeOutQuart(t);
+    const current = Math.round(eased * pct);
+    fill.style.width = (eased * pct) + '%';
+    label.textContent = current + '%';
+    if(t < 1){
+      requestAnimationFrame(tick);
+    } else {
       fill.style.width = pct + '%';
-    });
-  });
+      label.textContent = pct + '%';
+    }
+  }
+  requestAnimationFrame(tick);
 }
 
 document.getElementById('btn-practice-again').onclick = ()=>{
@@ -2867,8 +2962,7 @@ function createOnlineRoom(levelCounts){
     conn = c;
     conn.on('open', ()=>{
       sendToPeer(msgOf('init', { deck: ONLINE.deck, maxHp: ONLINE.maxHp, totalRounds: ONLINE.totalRounds, hostName: hostDisplayName }));
-      enterOnlineBattle();
-      hostStartRound();
+      enterOnlineBattle(hostStartRound);
     });
     conn.on('data', hostHandleMessage);
     conn.on('close', handlePeerDisconnect);
@@ -3071,8 +3165,7 @@ function onlineHostPlayAgain(){
   const hp0 = computeStartHP(deck);
   ONLINE = { deck, maxHp:hp0, totalRounds: deck.length, idx:0, hp:{p1:hp0,p2:hp0}, score:{p1:0,p2:0}, round:null };
   sendToPeer(msgOf('init', { deck: ONLINE.deck, maxHp: ONLINE.maxHp, totalRounds: ONLINE.totalRounds, hostName: hostDisplayName }));
-  enterOnlineBattle();
-  hostStartRound();
+  enterOnlineBattle(hostStartRound);
 }
 
 // ---------- 共用：畫面渲染 ----------
@@ -3080,12 +3173,16 @@ function onlineUpdateNames(){
   document.getElementById('p1-name').textContent = hostDisplayName || '房主';
   document.getElementById('p2-name').textContent = guestDisplayName || '玩家二';
 }
-function enterOnlineBattle(){
+function enterOnlineBattle(afterReady){
   onlineUpdateNames();
-  showScreen('screen-battle');
-
-  onlineRenderFromState();
-  onlineTickHandle = setInterval(onlineTick, 150);
+  document.getElementById('p1-hp-num').textContent = ONLINE.maxHp;
+  document.getElementById('p2-hp-num').textContent = ONLINE.maxHp;
+  showCountdown(()=>{
+    showScreen('screen-battle');
+    onlineRenderFromState();
+    onlineTickHandle = setInterval(onlineTick, 150);
+    if(afterReady) afterReady();
+  });
 }
 
 function onlineRenderFromState(){
@@ -3093,6 +3190,8 @@ function onlineRenderFromState(){
   const maxHp = ONLINE.maxHp || 100;
   document.getElementById('p1-hp').style.width = Math.max(0, ONLINE.hp.p1/maxHp*100) + '%';
   document.getElementById('p2-hp').style.width = Math.max(0, ONLINE.hp.p2/maxHp*100) + '%';
+  animateHpNumber('p1-hp-num', Math.max(0, ONLINE.hp.p1));
+  animateHpNumber('p2-hp-num', Math.max(0, ONLINE.hp.p2));
   document.getElementById('p1-score').textContent = ONLINE.score.p1;
   document.getElementById('p2-score').textContent = ONLINE.score.p2;
 
