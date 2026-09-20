@@ -6,7 +6,6 @@
   "scope": "./",
   "id": "/word-duel/",
   "display": "standalone",
-  "orientation": "portrait-primary",
   "background_color": "#0d0f14",
   "theme_color": "#0d0f14",
   "lang": "zh-TW",
