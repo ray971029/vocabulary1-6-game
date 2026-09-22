@@ -1,6 +1,7 @@
-const CACHE_NAME = 'word-duel-cache-v17';
+const CACHE_NAME = 'word-duel-cache-v24';
 const ASSETS = [
   './index.html',
+  './vocab-data.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
